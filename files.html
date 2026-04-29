@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow | Files</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">TF</span>
+          <span class="brand-copy">
+            <strong>TaskFlow</strong>
+            <small>Simple to-do and notes app</small>
+          </span>
+        </a>
+
+        <nav class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="dashboard.html">Dashboard</a>
+          <a href="tasks.html">Tasks</a>
+          <a href="notes.html">Notes</a>
+          <a class="active" href="files.html">Files</a>
+          <a href="profile.html">Profile</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="section-title">
+          <div>
+            <p class="eyebrow">Files</p>
+            <h1>File upload area</h1>
+          </div>
+          <p class="muted">This page is UI only and stores file details locally.</p>
+        </section>
+
+        <section class="card footer-space">
+          <h2>Upload Files</h2>
+          <form id="fileForm" class="form-grid">
+            <label class="full-width">
+              Choose Files
+              <input type="file" id="uploadFiles" multiple required />
+            </label>
+            <label>
+              Link to Task
+              <select id="fileTaskLink" name="fileTaskLink">
+                <option value="">No linked task</option>
+              </select>
+            </label>
+            <label>
+              Link to Note
+              <select id="fileNoteLink" name="fileNoteLink">
+                <option value="">No linked note</option>
+              </select>
+            </label>
+            <div class="full-width">
+              <button class="primary-button" type="submit">Add Files</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Uploaded Files</h2>
+          <div id="uploadsList" class="uploads-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

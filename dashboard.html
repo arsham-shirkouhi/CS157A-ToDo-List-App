@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow | Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">TF</span>
+          <span class="brand-copy">
+            <strong>TaskFlow</strong>
+            <small>Simple to-do and notes app</small>
+          </span>
+        </a>
+
+        <nav class="nav-links">
+          <a href="index.html">Home</a>
+          <a class="active" href="dashboard.html">Dashboard</a>
+          <a href="tasks.html">Tasks</a>
+          <a href="notes.html">Notes</a>
+          <a href="files.html">Files</a>
+          <a href="profile.html">Profile</a>
+        </nav>
+
+        <div class="topbar-actions">
+          <button class="ghost-button" id="logoutButton" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="section-title">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h1>Welcome, <span data-user-name>Guest User</span></h1>
+          </div>
+          <p class="muted">Signed in as <span data-user-email>guest@example.com</span></p>
+        </section>
+
+        <section class="stats-grid footer-space">
+          <article class="stat-card">
+            <span>Total Tasks</span>
+            <strong id="totalTasks">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>Due Soon</span>
+            <strong id="dueSoonTasks">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>Completed</span>
+            <strong id="completedTasks">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>Total Notes</span>
+            <strong id="totalNotes">0</strong>
+          </article>
+        </section>
+
+        <section class="content-grid footer-space">
+          <article class="card">
+            <h2>Priority List</h2>
+            <p class="muted">Tasks sorted by due date.</p>
+            <div id="priorityList" class="list-stack"></div>
+          </article>
+
+          <article class="card">
+            <h2>Reminders</h2>
+            <p class="muted">Simple reminder preview for your active tasks.</p>
+            <div id="reminderList" class="list-stack"></div>
+          </article>
+        </section>
+
+        <section>
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Quick Links</p>
+              <h2>Go to a section</h2>
+            </div>
+          </div>
+
+          <div class="quick-links">
+            <a class="quick-link" href="tasks.html">
+              <strong>Tasks</strong>
+              <span class="muted">Add, filter, and complete to-do items.</span>
+            </a>
+            <a class="quick-link" href="notes.html">
+              <strong>Notes</strong>
+              <span class="muted">Write notes and link them to tasks.</span>
+            </a>
+            <a class="quick-link" href="files.html">
+              <strong>Files</strong>
+              <span class="muted">See uploaded files and file details.</span>
+            </a>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
