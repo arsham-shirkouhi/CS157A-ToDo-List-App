@@ -39,11 +39,18 @@
             <p class="eyebrow">Notes</p>
             <h1>Create and save notes</h1>
           </div>
-          <p class="muted">Attach note files and link notes to tasks.</p>
+          <button class="primary-button" id="showNoteFormButton" type="button">Add Note</button>
         </section>
 
-        <section class="card footer-space">
-          <h2>New Note</h2>
+        <section class="card footer-space" id="noteFormCard" hidden>
+          <div class="toolbar">
+            <div>
+              <h2>New Note</h2>
+              <p class="muted">Add a note only when you want to create one.</p>
+            </div>
+            <button class="ghost-button" id="hideNoteFormButton" type="button">Cancel</button>
+          </div>
+
           <form id="noteForm" class="form-grid">
             <label>
               Note Title
@@ -69,14 +76,21 @@
               <input type="file" id="noteFiles" multiple />
             </label>
             <div id="filePreview" class="file-chips full-width"></div>
-            <div class="full-width">
+            <div class="full-width button-row">
               <button class="primary-button" type="submit">Save Note</button>
+              <button class="ghost-button" id="noteFormCancelButton" type="button">Cancel</button>
             </div>
           </form>
         </section>
 
-        <section class="card">
-          <h2>Saved Notes</h2>
+        <section class="card footer-space">
+          <div class="toolbar">
+            <div>
+              <h2>Saved Notes</h2>
+              <p class="muted">Your existing notes show first on this page.</p>
+            </div>
+          </div>
+
           <div id="notesList" class="notes-list"></div>
         </section>
       </main>

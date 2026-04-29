@@ -65,12 +65,45 @@
           <div class="card">
             <p class="eyebrow">Preview</p>
             <h2>What the app does</h2>
-            <p class="muted">This panel shows a few upcoming tasks from local demo data.</p>
+            <p class="muted">Start with the main app sections first, then look at the extra features below.</p>
             <div id="homePreviewList" class="preview-list"></div>
           </div>
         </section>
 
-        <section class="feature-grid footer-space">
+        <section class="section-title">
+          <div>
+            <p class="eyebrow">Main App Preview</p>
+            <h2>To-do list, notes, and files</h2>
+          </div>
+          <p class="muted">These are the first sections users would care about.</p>
+        </section>
+
+        <section class="content-grid footer-space">
+          <article class="card">
+            <h2>To-Do List</h2>
+            <p class="muted">Upcoming tasks from the app.</p>
+            <div id="homeTasksList" class="list-stack"></div>
+          </article>
+
+          <article class="card">
+            <h2>Notes</h2>
+            <p class="muted">Recent saved notes and linked work.</p>
+            <div id="homeNotesList" class="list-stack"></div>
+          </article>
+        </section>
+
+        <section class="card footer-space">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Files</p>
+              <h2>Uploaded file preview</h2>
+            </div>
+            <a class="secondary-button" href="files.html">Open Files Page</a>
+          </div>
+          <div id="homeFilesList" class="uploads-list"></div>
+        </section>
+
+        <section class="feature-grid feature-grid-secondary footer-space">
           <article class="feature-card">
             <h2>Task Tracking</h2>
             <p class="muted">Add due dates, reminders, tags, and short descriptions.</p>

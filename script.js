@@ -272,6 +272,104 @@ function renderPreview() {
   });
 }
 
+function renderHomeTasks() {
+  const container = document.querySelector("#homeTasksList");
+  if (!container) {
+    return;
+  }
+
+  const tasks = sortTasks(state.tasks).slice(0, 4);
+  container.innerHTML = "";
+
+  if (!tasks.length) {
+    container.innerHTML = `<div class="empty-state">No tasks yet.</div>`;
+    return;
+  }
+
+  tasks.forEach((task) => {
+    const badge = priorityLabel(task);
+    const item = document.createElement("div");
+    item.className = "list-item";
+    item.innerHTML = `
+      <div class="mini-head">
+        <div>
+          <strong>${escapeHtml(task.name)}</strong>
+          <div class="list-meta">${formatDate(task.dueDate)} • ${escapeHtml(task.tag || "General")}</div>
+        </div>
+        <span class="badge ${badge.className}">${badge.text}</span>
+      </div>
+    `;
+    container.append(item);
+  });
+}
+
+function renderHomeNotes() {
+  const container = document.querySelector("#homeNotesList");
+  if (!container) {
+    return;
+  }
+
+  const notes = [...state.notes]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 3);
+
+  container.innerHTML = "";
+
+  if (!notes.length) {
+    container.innerHTML = `<div class="empty-state">No notes yet.</div>`;
+    return;
+  }
+
+  notes.forEach((note) => {
+    const linkedTask = state.tasks.find((task) => task.id === note.taskId);
+    const item = document.createElement("div");
+    item.className = "list-item";
+    item.innerHTML = `
+      <strong>${escapeHtml(note.title)}</strong>
+      <div class="list-meta">${linkedTask ? `Linked to ${escapeHtml(linkedTask.name)}` : "No linked task"}</div>
+      <div class="list-meta">${formatDateTime(note.createdAt)}</div>
+    `;
+    container.append(item);
+  });
+}
+
+function renderHomeFiles() {
+  const container = document.querySelector("#homeFilesList");
+  if (!container) {
+    return;
+  }
+
+  const files = [...state.files]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 4);
+
+  container.innerHTML = "";
+
+  if (!files.length) {
+    container.innerHTML = `<div class="empty-state">No files yet.</div>`;
+    return;
+  }
+
+  files.forEach((file) => {
+    const task = state.tasks.find((item) => item.id === file.taskId);
+    const note = state.notes.find((item) => item.id === file.noteId);
+    const card = document.createElement("article");
+    card.className = "upload-card";
+    card.innerHTML = `
+      <div class="upload-head">
+        <div>
+          <strong>${escapeHtml(file.name)}</strong>
+          <div class="list-meta">${escapeHtml(file.type)} • ${escapeHtml(file.sizeLabel)}</div>
+          <div class="list-meta">
+            ${task ? `Task: ${escapeHtml(task.name)}` : "No task linked"}${note ? ` • Note: ${escapeHtml(note.title)}` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+    container.append(card);
+  });
+}
+
 function renderStats() {
   const totalTasks = document.querySelector("#totalTasks");
   const dueSoonTasks = document.querySelector("#dueSoonTasks");
@@ -540,6 +638,7 @@ function addTask(form) {
   renderPriorityList();
   renderReminderList();
   renderPreview();
+  renderHomeTasks();
   fillLinkSelects();
 }
 
@@ -576,6 +675,8 @@ function addNote(form) {
   renderNotes();
   renderFiles();
   renderStats();
+  renderHomeNotes();
+  renderHomeFiles();
   fillLinkSelects();
   showSelectedFiles();
 }
@@ -599,6 +700,8 @@ function addFile(form) {
   saveState();
   renderFiles();
   renderNotes();
+  renderHomeFiles();
+  renderHomeNotes();
 }
 
 function toggleTask(taskId) {
@@ -611,6 +714,7 @@ function toggleTask(taskId) {
   renderPriorityList();
   renderReminderList();
   renderPreview();
+  renderHomeTasks();
 }
 
 function deleteTask(taskId) {
@@ -629,6 +733,9 @@ function deleteTask(taskId) {
   renderPriorityList();
   renderReminderList();
   renderPreview();
+  renderHomeTasks();
+  renderHomeNotes();
+  renderHomeFiles();
   fillLinkSelects();
 }
 
@@ -641,6 +748,8 @@ function deleteFile(fileId) {
   saveState();
   renderFiles();
   renderNotes();
+  renderHomeFiles();
+  renderHomeNotes();
 }
 
 function saveProfile(form) {
@@ -714,12 +823,41 @@ function setupDashboardPage() {
 function setupTasksPage() {
   const taskForm = document.querySelector("#taskForm");
   const filter = document.querySelector("#taskFilter");
+  const taskFormCard = document.querySelector("#taskFormCard");
+  const showTaskFormButton = document.querySelector("#showTaskFormButton");
+  const hideTaskFormButton = document.querySelector("#hideTaskFormButton");
+  const taskFormCancelButton = document.querySelector("#taskFormCancelButton");
+
+  function openTaskForm() {
+    if (taskFormCard) {
+      taskFormCard.hidden = false;
+    }
+  }
+
+  function closeTaskForm() {
+    if (taskFormCard) {
+      taskFormCard.hidden = true;
+    }
+  }
+
+  if (showTaskFormButton) {
+    showTaskFormButton.addEventListener("click", openTaskForm);
+  }
+
+  if (hideTaskFormButton) {
+    hideTaskFormButton.addEventListener("click", closeTaskForm);
+  }
+
+  if (taskFormCancelButton) {
+    taskFormCancelButton.addEventListener("click", closeTaskForm);
+  }
 
   if (taskForm) {
     taskForm.addEventListener("submit", (event) => {
       event.preventDefault();
       addTask(taskForm);
       taskForm.reset();
+      closeTaskForm();
     });
   }
 
@@ -744,6 +882,39 @@ function setupTasksPage() {
 function setupNotesPage() {
   const noteForm = document.querySelector("#noteForm");
   const noteFiles = document.querySelector("#noteFiles");
+  const noteFormCard = document.querySelector("#noteFormCard");
+  const showNoteFormButton = document.querySelector("#showNoteFormButton");
+  const hideNoteFormButton = document.querySelector("#hideNoteFormButton");
+  const noteFormCancelButton = document.querySelector("#noteFormCancelButton");
+
+  function openNoteForm() {
+    if (noteFormCard) {
+      noteFormCard.hidden = false;
+    }
+  }
+
+  function closeNoteForm() {
+    if (noteFormCard) {
+      noteFormCard.hidden = true;
+    }
+
+    const preview = document.querySelector("#filePreview");
+    if (preview) {
+      preview.innerHTML = "";
+    }
+  }
+
+  if (showNoteFormButton) {
+    showNoteFormButton.addEventListener("click", openNoteForm);
+  }
+
+  if (hideNoteFormButton) {
+    hideNoteFormButton.addEventListener("click", closeNoteForm);
+  }
+
+  if (noteFormCancelButton) {
+    noteFormCancelButton.addEventListener("click", closeNoteForm);
+  }
 
   if (noteForm) {
     noteForm.addEventListener("submit", (event) => {
@@ -752,6 +923,7 @@ function setupNotesPage() {
       noteForm.reset();
       document.querySelector("#filePreview").innerHTML = "";
       fillLinkSelects();
+      closeNoteForm();
     });
   }
 
@@ -762,12 +934,41 @@ function setupNotesPage() {
 
 function setupFilesPage() {
   const fileForm = document.querySelector("#fileForm");
+  const fileFormCard = document.querySelector("#fileFormCard");
+  const showFileFormButton = document.querySelector("#showFileFormButton");
+  const hideFileFormButton = document.querySelector("#hideFileFormButton");
+  const fileFormCancelButton = document.querySelector("#fileFormCancelButton");
+
+  function openFileForm() {
+    if (fileFormCard) {
+      fileFormCard.hidden = false;
+    }
+  }
+
+  function closeFileForm() {
+    if (fileFormCard) {
+      fileFormCard.hidden = true;
+    }
+  }
+
+  if (showFileFormButton) {
+    showFileFormButton.addEventListener("click", openFileForm);
+  }
+
+  if (hideFileFormButton) {
+    hideFileFormButton.addEventListener("click", closeFileForm);
+  }
+
+  if (fileFormCancelButton) {
+    fileFormCancelButton.addEventListener("click", closeFileForm);
+  }
 
   if (fileForm) {
     fileForm.addEventListener("submit", (event) => {
       event.preventDefault();
       addFile(fileForm);
       fileForm.reset();
+      closeFileForm();
     });
   }
 
@@ -801,6 +1002,9 @@ function init() {
   fillLinkSelects();
   renderWelcome();
   renderPreview();
+  renderHomeTasks();
+  renderHomeNotes();
+  renderHomeFiles();
   renderStats();
   renderPriorityList();
   renderReminderList();

@@ -39,11 +39,18 @@
             <p class="eyebrow">Files</p>
             <h1>File upload area</h1>
           </div>
-          <p class="muted">This page is UI only and stores file details locally.</p>
+          <button class="primary-button" id="showFileFormButton" type="button">Add Files</button>
         </section>
 
-        <section class="card footer-space">
-          <h2>Upload Files</h2>
+        <section class="card footer-space" id="fileFormCard" hidden>
+          <div class="toolbar">
+            <div>
+              <h2>Upload Files</h2>
+              <p class="muted">Add new files only when you click the button.</p>
+            </div>
+            <button class="ghost-button" id="hideFileFormButton" type="button">Cancel</button>
+          </div>
+
           <form id="fileForm" class="form-grid">
             <label class="full-width">
               Choose Files
@@ -61,14 +68,21 @@
                 <option value="">No linked note</option>
               </select>
             </label>
-            <div class="full-width">
+            <div class="full-width button-row">
               <button class="primary-button" type="submit">Add Files</button>
+              <button class="ghost-button" id="fileFormCancelButton" type="button">Cancel</button>
             </div>
           </form>
         </section>
 
-        <section class="card">
-          <h2>Uploaded Files</h2>
+        <section class="card footer-space">
+          <div class="toolbar">
+            <div>
+              <h2>Uploaded Files</h2>
+              <p class="muted">The file list is shown first, with upload hidden until needed.</p>
+            </div>
+          </div>
+
           <div id="uploadsList" class="uploads-list"></div>
         </section>
       </main>

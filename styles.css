@@ -1,16 +1,16 @@
 :root {
-  --bg: #f7f8fc;
-  --surface: #ffffff;
-  --surface-soft: #f1f5f9;
-  --border: #dbe2ea;
-  --text: #142033;
-  --muted: #5f6b7a;
-  --primary: #2563eb;
-  --primary-soft: #dbeafe;
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
-  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --bg: #0b1120;
+  --surface: #111827;
+  --surface-soft: #1f2937;
+  --border: #243041;
+  --text: #e5edf8;
+  --muted: #9aa8bd;
+  --primary: #60a5fa;
+  --primary-soft: #172554;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --shadow: 0 14px 34px rgba(2, 6, 23, 0.45);
   --radius: 16px;
 }
 
@@ -26,7 +26,10 @@ body {
   margin: 0;
   font-family: "Inter", sans-serif;
   color: var(--text);
-  background: var(--bg);
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 24%),
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 20%),
+    var(--bg);
 }
 
 a {
@@ -134,13 +137,14 @@ button {
 }
 
 .primary-button {
-  color: #ffffff;
+  color: #08111f;
   background: var(--primary);
 }
 
 .secondary-button {
-  color: var(--primary);
+  color: #cfe1ff;
   background: var(--primary-soft);
+  border: 1px solid rgba(96, 165, 250, 0.22);
 }
 
 .ghost-button {
@@ -237,6 +241,10 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.feature-grid-secondary {
+  opacity: 0.86;
+}
+
 .stats-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -305,23 +313,23 @@ button {
 }
 
 .badge {
-  color: var(--primary);
-  background: var(--primary-soft);
+  color: #cfe1ff;
+  background: rgba(37, 99, 235, 0.24);
 }
 
 .badge.warning {
-  color: #92400e;
-  background: #fef3c7;
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.18);
 }
 
 .badge.success {
-  color: #166534;
-  background: #dcfce7;
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.18);
 }
 
 .tag {
-  color: #334155;
-  background: #e2e8f0;
+  color: #dbeafe;
+  background: #23324a;
 }
 
 .status {
@@ -369,7 +377,7 @@ textarea {
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #ffffff;
+  background: #0f172a;
   color: var(--text);
   outline: none;
 }
@@ -435,8 +443,8 @@ textarea {
   align-items: center;
   padding: 6px 10px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #3730a3;
+  background: #1e3a5f;
+  color: #dbeafe;
   font-size: 0.82rem;
 }
 
@@ -470,6 +478,7 @@ textarea {
 }
 
 @media (max-width: 900px) {
+
   .hero,
   .feature-grid,
   .stats-grid,
