@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow | Notes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">TF</span>
+          <span class="brand-copy">
+            <strong>TaskFlow</strong>
+            <small>Simple to-do and notes app</small>
+          </span>
+        </a>
+
+        <nav class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="dashboard.html">Dashboard</a>
+          <a href="tasks.html">Tasks</a>
+          <a class="active" href="notes.html">Notes</a>
+          <a href="files.html">Files</a>
+          <a href="profile.html">Profile</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="section-title">
+          <div>
+            <p class="eyebrow">Notes</p>
+            <h1>Create and save notes</h1>
+          </div>
+          <button class="primary-button" id="showNoteFormButton" type="button">Add Note</button>
+        </section>
+
+        <section class="card footer-space" id="noteFormCard" hidden>
+          <div class="toolbar">
+            <div>
+              <h2>New Note</h2>
+              <p class="muted">Add a note only when you want to create one.</p>
+            </div>
+            <button class="ghost-button" id="hideNoteFormButton" type="button">Cancel</button>
+          </div>
+
+          <form id="noteForm" class="form-grid">
+            <label>
+              Note Title
+              <input type="text" name="noteTitle" placeholder="Lecture summary" required />
+            </label>
+            <label>
+              Link to Task
+              <select id="noteTaskLink" name="noteTaskLink">
+                <option value="">No linked task</option>
+              </select>
+            </label>
+            <label class="full-width">
+              Note Contents
+              <textarea
+                name="noteContents"
+                rows="5"
+                placeholder="Write your note here."
+                required
+              ></textarea>
+            </label>
+            <label class="full-width">
+              Attach Files
+              <input type="file" id="noteFiles" multiple />
+            </label>
+            <div id="filePreview" class="file-chips full-width"></div>
+            <div class="full-width button-row">
+              <button class="primary-button" type="submit">Save Note</button>
+              <button class="ghost-button" id="noteFormCancelButton" type="button">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card footer-space">
+          <div class="toolbar">
+            <div>
+              <h2>Saved Notes</h2>
+              <p class="muted">Your existing notes show first on this page.</p>
+            </div>
+          </div>
+
+          <div id="notesList" class="notes-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

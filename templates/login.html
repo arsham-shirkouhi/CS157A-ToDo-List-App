@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow | Log In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">TF</span>
+          <span class="brand-copy">
+            <strong>TaskFlow</strong>
+            <small>Simple to-do and notes app</small>
+          </span>
+        </a>
+
+        <nav class="nav-links">
+          <a href="index.html">Home</a>
+          <a class="active" href="login.html">Log In</a>
+          <a href="signup.html">Sign Up</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="card form-card">
+          <div class="centered">
+            <p class="eyebrow">Welcome back</p>
+            <h1>Log In</h1>
+            <p class="muted">This is a frontend-only login form for your project demo.</p>
+          </div>
+
+          <form id="loginForm" class="stack-fields">
+            <label>
+              Email
+              <input type="email" name="email" placeholder="student@example.com" required />
+            </label>
+            <label>
+              Password
+              <input type="password" name="password" placeholder="Enter password" required />
+            </label>
+            <button class="primary-button" type="submit">Log In</button>
+          </form>
+
+          <p class="auth-switch centered">Need an account? <a href="signup.html">Go to sign up</a></p>
+          <p class="auth-switch centered"><a href="index.html">Back to home</a></p>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
