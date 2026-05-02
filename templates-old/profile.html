@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow | Profile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">TF</span>
+          <span class="brand-copy">
+            <strong>TaskFlow</strong>
+            <small>Simple to-do and notes app</small>
+          </span>
+        </a>
+
+        <nav class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="dashboard.html">Dashboard</a>
+          <a href="tasks.html">Tasks</a>
+          <a href="notes.html">Notes</a>
+          <a href="files.html">Files</a>
+          <a class="active" href="profile.html">Profile</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="section-title">
+          <div>
+            <p class="eyebrow">Profile</p>
+            <h1>User account</h1>
+          </div>
+          <p class="muted">Simple profile and settings page.</p>
+        </section>
+
+        <section class="two-column">
+          <article class="card">
+            <h2>Account Information</h2>
+            <form id="profileForm" class="stack-fields">
+              <label>
+                User Name
+                <input id="profileName" name="profileName" type="text" required />
+              </label>
+              <label>
+                Email
+                <input id="profileEmail" name="profileEmail" type="email" required />
+              </label>
+              <label>
+                New Password
+                <input type="password" name="profilePassword" placeholder="Change password" />
+              </label>
+              <button class="primary-button" type="submit">Save Profile</button>
+            </form>
+          </article>
+
+          <article class="card">
+            <h2>Preferences</h2>
+            <div class="stack-fields">
+              <label>
+                Reminder Preference
+                <select id="profileReminderPreference" name="profileReminderPreference" form="profileForm">
+                  <option value="Daily summary">Daily summary</option>
+                  <option value="Weekly summary">Weekly summary</option>
+                  <option value="Only urgent reminders">Only urgent reminders</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="footer-space"></div>
+
+            <h2>Account Type</h2>
+            <p class="muted">Current plan</p>
+            <span id="profileStatus" class="badge success">Free Plan</span>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow | Tasks</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">TF</span>
+          <span class="brand-copy">
+            <strong>TaskFlow</strong>
+            <small>Simple to-do and notes app</small>
+          </span>
+        </a>
+
+        <nav class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="dashboard.html">Dashboard</a>
+          <a class="active" href="tasks.html">Tasks</a>
+          <a href="notes.html">Notes</a>
+          <a href="files.html">Files</a>
+          <a href="profile.html">Profile</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="section-title">
+          <div>
+            <p class="eyebrow">Tasks</p>
+            <h1>Manage your to-do list</h1>
+          </div>
+          <button class="primary-button" id="showTaskFormButton" type="button">Add Task</button>
+        </section>
+
+        <section class="card footer-space" id="taskFormCard" hidden>
+          <div class="toolbar">
+            <div>
+              <h2>Add Task</h2>
+              <p class="muted">Create a new task only when you need it.</p>
+            </div>
+            <button class="ghost-button" id="hideTaskFormButton" type="button">Cancel</button>
+          </div>
+
+          <form id="taskForm" class="form-grid">
+            <label>
+              Task Name
+              <input type="text" name="taskName" placeholder="Finish presentation" required />
+            </label>
+            <label>
+              Due Date
+              <input type="date" name="taskDueDate" required />
+            </label>
+            <label>
+              Tag / Category
+              <input type="text" name="taskTag" placeholder="School, Work, Personal" />
+            </label>
+            <label>
+              Reminder Frequency
+              <select name="taskReminder">
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Custom">Custom</option>
+              </select>
+            </label>
+            <label class="full-width">
+              Description
+              <textarea
+                name="taskDescription"
+                rows="4"
+                placeholder="Write a short description for the task."
+              ></textarea>
+            </label>
+            <div class="full-width button-row">
+              <button class="primary-button" type="submit">Add Task</button>
+              <button class="ghost-button" id="taskFormCancelButton" type="button">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card footer-space">
+          <div class="toolbar">
+            <div>
+              <h2>Task List</h2>
+              <p class="muted">Your tasks are the main thing shown on this page.</p>
+            </div>
+
+            <label>
+              Filter
+              <select id="taskFilter">
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="dueSoon">Due Soon</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="taskList" class="task-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
