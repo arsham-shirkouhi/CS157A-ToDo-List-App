@@ -28,9 +28,6 @@ def _now_sql() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-# --- Users ---
-
-
 def get_user_by_id(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
     rows = db.query(
         "SELECT `userID`, `name`, `email` FROM users WHERE `userID` = %s",
@@ -46,21 +43,6 @@ def get_premium(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
         (user_id,),
     )
     return rows[0] if rows else None
-
-
-def insert_default_premium_for_user(db: AppDatabase, user_id: int) -> int:
-    """
-    Create one `premium` row for a new user. Defaults only (no billing UI).
-    `payment` holds payment method; free tier uses placeholder values.
-    """
-    return db.execute_write(
-        """
-        INSERT INTO premium (`userID`, `account_status`, `billing_address`, `re_bill_date`, `payment`, `amount`)
-        VALUES (%s, 'N', '', NULL, 'none', 0.00)
-        ON DUPLICATE KEY UPDATE `userID` = `userID`
-        """,
-        (user_id,),
-    )
 
 
 def upsert_premium(
@@ -89,9 +71,6 @@ def upsert_premium(
     )
 
 
-# --- Tasks ---
-
-
 def list_tasks(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     return db.query(
         "SELECT `taskID`, `userID`, `task_name`, `status`, `due_date`, `date_created`, `last_reminder_date`, "
@@ -111,7 +90,6 @@ def create_task(
     reminder_freq_hour: Optional[int] = None,
     status: str = "A",
 ) -> int:
-    """``status`` is a single CHAR, e.g. ``A`` active, ``C`` completed (your app can define meanings)."""
     sql = """
         INSERT INTO tasks (`userID`, `task_name`, `status`, `due_date`, `date_created`, `last_reminder_date`,
             `reminder_freq_day`, `reminder_freq_hour`, `tags`)
@@ -181,9 +159,6 @@ def delete_task(db: AppDatabase, user_id: int, task_id: int) -> int:
     )
 
 
-# --- Notes ---
-
-
 def list_notes(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     return db.query(
         "SELECT `noteID`, `userID`, `date_time`, `note_title`, `contents` FROM notes "
@@ -233,9 +208,6 @@ def delete_note(db: AppDatabase, user_id: int, note_id: int) -> int:
     )
 
 
-# --- Files ---
-
-
 def list_files(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     return db.query(
         "SELECT `fileID`, `userID`, `link`, `local_file_address` FROM files WHERE `userID` = %s",
@@ -244,7 +216,6 @@ def list_files(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
 
 
 def _read_bytes_from_local_reference(local_file_address: str) -> Optional[bytes]:
-    """Load file bytes from a path stored in `local_file_address` (absolute or relative to cwd)."""
     raw = (local_file_address or "").strip()
     if not raw:
         return None
@@ -256,31 +227,21 @@ def _read_bytes_from_local_reference(local_file_address: str) -> Optional[bytes]
     return p.read_bytes()
 
 
-def _maybe_create_note_from_pdf(db: AppDatabase, user_id: int, local_file_address: str) -> None:
-    path_str = (local_file_address or "").strip()
-    if not path_str.lower().endswith(".pdf"):
-        return
-    pdf_bytes = _read_bytes_from_local_reference(path_str)
-    if not pdf_bytes:
-        return
-    title = f"Notes from {Path(path_str).name}"
-    ok, body = pdf_bytes_to_study_notes(pdf_bytes)
-    if not ok:
-        body = (
-            f"(PDF conversion did not produce AI notes. Reason: {body})\n\n"
-            "You can still open the original file using the stored path or link."
-        )
-    create_note(db, user_id, title[:255], body)
-
-
 def create_file_record(db: AppDatabase, user_id: int, link: str, local_file_address: str) -> int:
     sql = """
         INSERT INTO files (`userID`, `link`, `local_file_address`)
         VALUES (%s, %s, %s)
     """
     path_str = (local_file_address or "").strip()
-    file_id = db.execute_write(sql, (user_id, link, local_file_address))
-    _maybe_create_note_from_pdf(db, user_id, path_str)
+    file_id = db.execute_write(sql, (user_id, link, path_str))
+    if path_str.lower().endswith(".pdf"):
+        data = _read_bytes_from_local_reference(path_str)
+        if data:
+            title = f"Notes from {Path(path_str).name}"
+            ok, body = pdf_bytes_to_study_notes(data)
+            if not ok:
+                body = f"PDF note import failed: {body}"
+            create_note(db, user_id, title[:255], body)
     return file_id
 
 
@@ -293,9 +254,6 @@ def delete_file_record(db: AppDatabase, user_id: int, file_id: int) -> int:
         "DELETE FROM files WHERE `fileID` = %s AND `userID` = %s",
         (file_id, user_id),
     )
-
-
-# --- Task–note links (many-to-many for this schema) ---
 
 
 def link_task_to_note(db: AppDatabase, user_id: int, task_id: int, note_id: int) -> int:
@@ -334,9 +292,6 @@ def tasks_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str
     return db.query(sql, (user_id, note_id))
 
 
-# --- Task–file links (`task_files`) ---
-
-
 def link_task_to_file(db: AppDatabase, user_id: int, task_id: int, file_id: int) -> int:
     sql = """
         INSERT INTO task_files (`userID`, `taskID`, `fileID`)
@@ -373,9 +328,6 @@ def tasks_for_file(db: AppDatabase, user_id: int, file_id: int) -> list[dict[str
     return db.query(sql, (user_id, file_id))
 
 
-# --- PDF → note text ---
-
-
 def _extract_pdf_text(pdf_bytes: bytes) -> tuple[bool, str]:
     try:
         from pypdf import PdfReader  # type: ignore
@@ -395,34 +347,20 @@ def _extract_pdf_text(pdf_bytes: bytes) -> tuple[bool, str]:
 
 
 def _format_plain_text_as_markdown_notes(raw_text: str) -> str:
-    """
-    Turn extracted PDF text into simple markdown notes using only the standard library.
-    """
     text = raw_text.strip()
     if not text:
-        return "_No extractable text to format._"
+        return "(empty)"
 
-    parts = [
-        "# Notes from PDF",
-        "",
-        "_Extracted locally (open source: [pypdf](https://github.com/py-pdf/pypdf))._",
-        "_Optional: set `OPENAI_API_KEY` to also try an AI pass after extraction._",
-        "",
-    ]
-
-    blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
-    if not blocks:
-        blocks = [text]
-
+    lines = ["# From PDF", ""]
+    blocks = [b.strip() for b in text.split("\n\n") if b.strip()] or [text]
     for i, block in enumerate(blocks[:150], start=1):
-        parts.append(f"## Part {i}")
-        parts.append("")
-        parts.append(block[:12_000])
-        parts.append("")
-
-    body = "\n".join(parts).strip()
+        lines.append(f"## Part {i}")
+        lines.append("")
+        lines.append(block[:12000])
+        lines.append("")
+    body = "\n".join(lines).strip()
     if len(body) > 100_000:
-        body = body[:99_997] + "\n\n…"
+        return body[:99997] + "\n\n…"
     return body
 
 
@@ -471,13 +409,6 @@ def _openai_summarize_to_notes(raw_text: str) -> tuple[bool, str]:
 
 
 def pdf_bytes_to_study_notes(pdf_bytes: bytes) -> tuple[bool, str]:
-    """
-    Extract text with pypdf (BSD-style OSS), then either:
-    - format as markdown locally (no API key), or
-    - if ``OPENAI_API_KEY`` is set, try OpenAI first and fall back to local formatting on failure.
-
-    Returns (success, message_or_note_body).
-    """
     ok, text_or_err = _extract_pdf_text(pdf_bytes)
     if not ok:
         return False, text_or_err

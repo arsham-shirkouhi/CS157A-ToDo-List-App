@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 import bcrypt
 
-from application_layer import AppDatabase, insert_default_premium_for_user
+from application_layer import AppDatabase, upsert_premium
 
 
 def _hash_password(plain: str) -> str:
@@ -26,16 +26,12 @@ def get_user_by_email(db: AppDatabase, email: str) -> Optional[dict[str, Any]]:
     return rows[0] if rows else None
 
 
-def create_user(db: AppDatabase, name: str, email: str, plain_password: str) -> Tuple[bool, str, Optional[int]]:
-    """
-    Register a new user. Fails if email is already used.
-    Returns (success, message, user_id or none).
-    """
+def create_user(db: AppDatabase, name: str, email: str, plain_password: str) -> dict[str, Any]:
     email_clean = email.strip()
     if not name.strip() or not email_clean or not plain_password:
-        return False, "Name, email, and password are required.", None
+        return {"success": False, "message": "Name, email, and password are required.", "user_id": None}
     if get_user_by_email(db, email_clean):
-        return False, "An account with this email already exists.", None
+        return {"success": False, "message": "An account with this email already exists.", "user_id": None}
 
     pw = _hash_password(plain_password)
     new_id = db.execute_write(
@@ -44,12 +40,11 @@ def create_user(db: AppDatabase, name: str, email: str, plain_password: str) -> 
     )
     uid = int(new_id) if new_id else None
     if uid is not None:
-        insert_default_premium_for_user(db, uid)
-    return True, "Account created.", uid
+        upsert_premium(db, uid, "N", "", None, "none", 0.0)
+    return {"success": True, "message": "Account created.", "user_id": uid}
 
 
 def verify_credentials(db: AppDatabase, email: str, plain_password: str) -> Optional[dict[str, Any]]:
-    """Return user row (without password) if email/password match, else None."""
     user = get_user_by_email(db, email)
     if not user:
         return None
@@ -58,30 +53,9 @@ def verify_credentials(db: AppDatabase, email: str, plain_password: str) -> Opti
     return {"userID": user["userID"], "name": user["name"], "email": user["email"]}
 
 
-def authenticate_user(email: str, password: str, db: AppDatabase) -> Tuple[bool, Optional[dict[str, Any]]]:
-    """Returns (is_authenticated, user_dict_without_password_or_none)."""
-    user = verify_credentials(db, email, password)
-    if user:
-        return True, user
-    return False, None
-
-
-def signup_user(name: str, email: str, password: str, db: AppDatabase) -> dict[str, Any]:
-    """
-    High-level sign up response dict for a controller to use.
-    """
-    ok, message, uid = create_user(db, name, email, password)
-    if not ok:
-        return {"success": False, "message": message, "user_id": None}
-    return {"success": True, "message": message, "user_id": uid}
-
-
 def login_response(email: str, password: str, db: AppDatabase) -> dict[str, Any]:
-    """
-    High-level login response dict.
-    """
-    ok, user = authenticate_user(email, password, db)
-    if not ok:
+    user = verify_credentials(db, email, password)
+    if not user:
         return {
             "success": False,
             "message": "Invalid email or password.",
