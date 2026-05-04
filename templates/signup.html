@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="static/assets/css/styles.css" />
+    <link rel="stylesheet" href="/static/assets/css/styles.css" />
   </head>
   <body>
     <div class="page-shell">
@@ -35,34 +35,46 @@
           <div class="centered">
             <p class="eyebrow">New account</p>
             <h1>Sign Up</h1>
-            <p class="muted">Create a simple demo account and continue to the dashboard.</p>
           </div>
 
-          <form id="signupForm" class="stack-fields">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <ul class="muted" style="margin-bottom: 1rem">
+                {% for category, message in messages %}
+                  <li>{{ message }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endwith %}
+
+          <form method="post" class="stack-fields" novalidate>
+            {{ form.hidden_tag() }}
             <label>
               Name
-              <input type="text" name="name" placeholder="Your full name" required />
+              {{ form.name(placeholder="Your full name") }}
             </label>
+            {% for e in form.name.errors %}<p class="muted">{{ e }}</p>{% endfor %}
             <label>
               Email
-              <input type="email" name="email" placeholder="student@example.com" required />
+              {{ form.email(placeholder="student@example.com") }}
             </label>
+            {% for e in form.email.errors %}<p class="muted">{{ e }}</p>{% endfor %}
             <label>
               Password
-              <input type="password" name="password" placeholder="Create password" required />
+              {{ form.password(placeholder="Create password") }}
             </label>
+            {% for e in form.password.errors %}<p class="muted">{{ e }}</p>{% endfor %}
             <label>
-              Confirm Password
-              <input type="password" name="confirmPassword" placeholder="Confirm password" required />
+              Confirm password
+              {{ form.confirm(placeholder="Confirm password") }}
             </label>
-            <button class="primary-button" type="submit">Create Account</button>
+            {% for e in form.confirm.errors %}<p class="muted">{{ e }}</p>{% endfor %}
+            {{ form.submit(class="primary-button") }}
           </form>
 
           <p class="auth-switch centered">Already have an account? <a href="/login">Log in</a></p>
         </section>
       </main>
     </div>
-
-    <script src="static/assets/js/script.js"></script>
   </body>
 </html>

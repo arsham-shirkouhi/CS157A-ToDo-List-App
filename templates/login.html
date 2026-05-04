@@ -10,12 +10,12 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="static/assets/css/styles.css" />
+    <link rel="stylesheet" href="/static/assets/css/styles.css" />
   </head>
   <body>
     <div class="page-shell">
       <header class="topbar">
-        <a class="brand" href="index">
+        <a class="brand" href="/home">
           <span class="brand-mark">TF</span>
           <span class="brand-copy">
             <strong>TaskFlow</strong>
@@ -35,19 +35,31 @@
           <div class="centered">
             <p class="eyebrow">Welcome back</p>
             <h1>Log In</h1>
-            <p class="muted">This is a frontend-only login form for your project demo.</p>
           </div>
 
-          <form id="loginForm" class="stack-fields">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <ul class="muted" style="margin-bottom: 1rem">
+                {% for category, message in messages %}
+                  <li>{{ message }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endwith %}
+
+          <form method="post" class="stack-fields" novalidate>
+            {{ form.hidden_tag() }}
             <label>
               Email
-              <input type="email" name="email" placeholder="student@example.com" required />
+              {{ form.email(placeholder="student@example.com") }}
             </label>
+            {% for e in form.email.errors %}<p class="muted">{{ e }}</p>{% endfor %}
             <label>
               Password
-              <input type="password" name="password" placeholder="Enter password" required />
+              {{ form.password(placeholder="Enter password") }}
             </label>
-            <button class="primary-button" type="submit">Log In</button>
+            {% for e in form.password.errors %}<p class="muted">{{ e }}</p>{% endfor %}
+            {{ form.submit(class="primary-button") }}
           </form>
 
           <p class="auth-switch centered">Need an account? <a href="/signup">Go to sign up</a></p>
@@ -55,7 +67,5 @@
         </section>
       </main>
     </div>
-
-    <script src="static/assets/js/script.js"></script>
   </body>
 </html>

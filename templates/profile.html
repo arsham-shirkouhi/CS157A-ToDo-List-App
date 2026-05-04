@@ -10,9 +10,9 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="static/assets/css/styles.css" />
+    <link rel="stylesheet" href="/static/assets/css/styles.css" />
   </head>
-  <body>
+  <body data-sync="true" data-csrf="{{ csrf_token_value }}">
     <div class="page-shell">
       <header class="topbar">
         <a class="brand" href="/home">
@@ -48,11 +48,11 @@
             <form id="profileForm" class="stack-fields">
               <label>
                 User Name
-                <input id="profileName" name="profileName" type="text" required />
+                <input id="profileName" name="profileName" type="text" value="{{ current_user.name }}" required />
               </label>
               <label>
                 Email
-                <input id="profileEmail" name="profileEmail" type="email" required />
+                <input id="profileEmail" name="profileEmail" type="email" value="{{ current_user.email }}" required />
               </label>
               <label>
                 New Password
@@ -79,12 +79,12 @@
 
             <h2>Account Type</h2>
             <p class="muted">Current plan</p>
-            <span id="profileStatus" class="badge success">Free Plan</span>
+            <span id="profileStatus" class="badge success">{% if premium and premium.account_status == 'Y' %}Premium{% else %}Free Plan{% endif %}</span>
           </article>
         </section>
       </main>
     </div>
 
-    <script src="static/assets/js/script.js"></script>
+    <script src="/static/assets/js/script.js"></script>
   </body>
 </html>

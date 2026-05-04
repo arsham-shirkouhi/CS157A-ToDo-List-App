@@ -12,7 +12,7 @@ const defaultState = {
   files: [],
 };
 
-let state = loadState();
+let state = structuredClone(defaultState);
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -41,7 +41,50 @@ function loadState() {
 }
 
 function saveState() {
+  if (syncOn()) {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY + "_prefs",
+        JSON.stringify({ user: { reminderPreference: state.user.reminderPreference } }),
+      );
+    } catch (_) {}
+    return;
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function syncOn() {
+  return document.body?.dataset?.sync === "true";
+}
+
+function apiHeaders() {
+  const h = { "Content-Type": "application/json" };
+  const t = document.body?.dataset?.csrf;
+  if (t) {
+    h["X-CSRFToken"] = t;
+  }
+  return h;
+}
+
+function apiJson(method, url, body) {
+  const o = { method, headers: apiHeaders(), credentials: "same-origin" };
+  if (body !== undefined) {
+    o.body = JSON.stringify(body);
+  }
+  return fetch(url, o);
+}
+
+async function pullState() {
+  const r = await fetch("/api/state", { credentials: "same-origin" });
+  if (!r.ok) {
+    return;
+  }
+  const d = await r.json();
+  state.tasks = d.tasks || [];
+  state.notes = d.notes || [];
+  state.files = d.files || [];
+  const rem = state.user.reminderPreference;
+  state.user = { ...state.user, ...(d.user || {}), reminderPreference: rem };
 }
 
 function createId() {
@@ -61,6 +104,9 @@ function formatDate(dateString) {
 }
 
 function formatDateTime(dateString) {
+  if (!dateString) {
+    return "—";
+  }
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -132,6 +178,9 @@ function escapeHtml(value) {
 }
 
 function ensureDemoData() {
+  if (syncOn()) {
+    return;
+  }
   if (state.tasks.length || state.notes.length || state.files.length) {
     return;
   }
@@ -482,12 +531,16 @@ function renderTasks() {
 
   tasks.forEach((task) => {
     const badge = priorityLabel(task);
+    const tid = String(task.id);
+    const titleHtml = /^\d+$/.test(tid)
+      ? `<a href="/tasks/${tid}">${escapeHtml(task.name)}</a>`
+      : escapeHtml(task.name);
     const card = document.createElement("article");
     card.className = `task-card${task.completed ? " completed" : ""}`;
     card.innerHTML = `
       <div class="task-head">
         <div>
-          <h3 class="task-title">${escapeHtml(task.name)}</h3>
+          <h3 class="task-title">${titleHtml}</h3>
           <div class="inline-actions">
             <span class="tag">${escapeHtml(task.tag || "General")}</span>
             <span class="badge ${badge.className}">${badge.text}</span>
@@ -523,12 +576,16 @@ function renderNotes() {
     .forEach((note) => {
       const linkedTask = state.tasks.find((task) => task.id === note.taskId);
       const fileNames = state.files.filter((file) => (note.fileIds || []).includes(file.id));
+      const nid = String(note.id);
+      const titleHtml = /^\d+$/.test(nid)
+        ? `<a href="/notes/${nid}">${escapeHtml(note.title)}</a>`
+        : escapeHtml(note.title);
       const card = document.createElement("article");
       card.className = "note-card";
       card.innerHTML = `
         <div class="note-head">
           <div>
-            <h3 class="note-title">${escapeHtml(note.title)}</h3>
+            <h3 class="note-title">${titleHtml}</h3>
             <div class="list-meta">${linkedTask ? `Linked to ${escapeHtml(linkedTask.name)}` : "No linked task"}</div>
           </div>
           <div class="list-meta">${formatDateTime(note.createdAt)}</div>
@@ -619,20 +676,33 @@ function showSelectedFiles() {
     : "";
 }
 
-function addTask(form) {
+async function addTask(form) {
   const formData = new FormData(form);
-  state.tasks.push({
-    id: createId(),
-    name: formData.get("taskName").trim(),
-    dueDate: formData.get("taskDueDate"),
-    tag: formData.get("taskTag").trim(),
-    reminder: formData.get("taskReminder"),
-    description: formData.get("taskDescription").trim(),
-    completed: false,
-    createdAt: new Date().toISOString(),
-  });
-
-  saveState();
+  if (syncOn()) {
+    const r = await apiJson("POST", "/api/task", {
+      name: formData.get("taskName").trim(),
+      dueDate: formData.get("taskDueDate"),
+      tag: formData.get("taskTag").trim(),
+      reminder: formData.get("taskReminder"),
+      completed: false,
+    });
+    if (!r.ok) {
+      return;
+    }
+    await pullState();
+  } else {
+    state.tasks.push({
+      id: createId(),
+      name: formData.get("taskName").trim(),
+      dueDate: formData.get("taskDueDate"),
+      tag: formData.get("taskTag").trim(),
+      reminder: formData.get("taskReminder"),
+      description: formData.get("taskDescription").trim(),
+      completed: false,
+      createdAt: new Date().toISOString(),
+    });
+    saveState();
+  }
   renderTasks();
   renderStats();
   renderPriorityList();
@@ -642,36 +712,62 @@ function addTask(form) {
   fillLinkSelects();
 }
 
-function addNote(form) {
+async function addNote(form) {
   const formData = new FormData(form);
   const files = Array.from(document.querySelector("#noteFiles")?.files || []);
-  const noteId = createId();
-  const fileIds = [];
+  const taskLink = formData.get("noteTaskLink") || "";
 
-  files.forEach((file) => {
-    const fileId = createId();
-    fileIds.push(fileId);
-    state.files.push({
-      id: fileId,
-      name: file.name,
-      sizeLabel: formatFileSize(file.size),
-      type: file.type || "File",
-      taskId: formData.get("noteTaskLink") || "",
-      noteId,
-      createdAt: new Date().toISOString(),
+  if (syncOn()) {
+    const r = await apiJson("POST", "/api/note", {
+      title: formData.get("noteTitle").trim(),
+      contents: formData.get("noteContents").trim(),
+      task_id: taskLink || null,
     });
-  });
-
-  state.notes.push({
-    id: noteId,
-    title: formData.get("noteTitle").trim(),
-    contents: formData.get("noteContents").trim(),
-    taskId: formData.get("noteTaskLink") || "",
-    createdAt: new Date().toISOString(),
-    fileIds,
-  });
-
-  saveState();
+    if (!r.ok) {
+      return;
+    }
+    const created = await r.json();
+    const nid = created.id;
+    if (nid != null && files.length) {
+      for (const file of files) {
+        const fr = await apiJson("POST", "/api/file", {
+          link: file.name,
+          local_file_address: "",
+          task_id: taskLink || null,
+          note_id: nid,
+        });
+        if (!fr.ok) {
+          return;
+        }
+      }
+    }
+    await pullState();
+  } else {
+    const noteId = createId();
+    const fileIds = [];
+    files.forEach((file) => {
+      const fileId = createId();
+      fileIds.push(fileId);
+      state.files.push({
+        id: fileId,
+        name: file.name,
+        sizeLabel: formatFileSize(file.size),
+        type: file.type || "File",
+        taskId: taskLink,
+        noteId,
+        createdAt: new Date().toISOString(),
+      });
+    });
+    state.notes.push({
+      id: noteId,
+      title: formData.get("noteTitle").trim(),
+      contents: formData.get("noteContents").trim(),
+      taskId: taskLink,
+      createdAt: new Date().toISOString(),
+      fileIds,
+    });
+    saveState();
+  }
   renderNotes();
   renderFiles();
   renderStats();
@@ -681,34 +777,62 @@ function addNote(form) {
   showSelectedFiles();
 }
 
-function addFile(form) {
+async function addFile(form) {
   const formData = new FormData(form);
   const pickedFiles = Array.from(document.querySelector("#uploadFiles")?.files || []);
+  const taskId = formData.get("fileTaskLink") || "";
+  const noteId = formData.get("fileNoteLink") || "";
 
-  pickedFiles.forEach((file) => {
-    state.files.push({
-      id: createId(),
-      name: file.name,
-      sizeLabel: formatFileSize(file.size),
-      type: file.type || "File",
-      taskId: formData.get("fileTaskLink") || "",
-      noteId: formData.get("fileNoteLink") || "",
-      createdAt: new Date().toISOString(),
+  if (syncOn()) {
+    for (const file of pickedFiles) {
+      const r = await apiJson("POST", "/api/file", {
+        link: file.name,
+        local_file_address: "",
+        task_id: taskId || null,
+        note_id: noteId || null,
+      });
+      if (!r.ok) {
+        return;
+      }
+    }
+    await pullState();
+  } else {
+    pickedFiles.forEach((file) => {
+      state.files.push({
+        id: createId(),
+        name: file.name,
+        sizeLabel: formatFileSize(file.size),
+        type: file.type || "File",
+        taskId,
+        noteId,
+        createdAt: new Date().toISOString(),
+      });
     });
-  });
-
-  saveState();
+    saveState();
+  }
   renderFiles();
   renderNotes();
   renderHomeFiles();
   renderHomeNotes();
 }
 
-function toggleTask(taskId) {
-  state.tasks = state.tasks.map((task) =>
-    task.id === taskId ? { ...task, completed: !task.completed } : task
-  );
-  saveState();
+async function toggleTask(taskId) {
+  const cur = state.tasks.find((t) => t.id === taskId);
+  if (!cur) {
+    return;
+  }
+  if (syncOn()) {
+    const r = await apiJson("PUT", `/api/task/${taskId}`, { completed: !cur.completed });
+    if (!r.ok) {
+      return;
+    }
+    await pullState();
+  } else {
+    state.tasks = state.tasks.map((task) =>
+      task.id === taskId ? { ...task, completed: !task.completed } : task,
+    );
+    saveState();
+  }
   renderTasks();
   renderStats();
   renderPriorityList();
@@ -717,15 +841,23 @@ function toggleTask(taskId) {
   renderHomeTasks();
 }
 
-function deleteTask(taskId) {
-  state.tasks = state.tasks.filter((task) => task.id !== taskId);
-  state.notes = state.notes.map((note) =>
-    note.taskId === taskId ? { ...note, taskId: "" } : note
-  );
-  state.files = state.files.map((file) =>
-    file.taskId === taskId ? { ...file, taskId: "" } : file
-  );
-  saveState();
+async function deleteTask(taskId) {
+  if (syncOn()) {
+    const r = await apiJson("DELETE", `/api/task/${taskId}`);
+    if (!r.ok) {
+      return;
+    }
+    await pullState();
+  } else {
+    state.tasks = state.tasks.filter((task) => task.id !== taskId);
+    state.notes = state.notes.map((note) =>
+      note.taskId === taskId ? { ...note, taskId: "" } : note,
+    );
+    state.files = state.files.map((file) =>
+      file.taskId === taskId ? { ...file, taskId: "" } : file,
+    );
+    saveState();
+  }
   renderTasks();
   renderNotes();
   renderFiles();
@@ -739,28 +871,50 @@ function deleteTask(taskId) {
   fillLinkSelects();
 }
 
-function deleteFile(fileId) {
-  state.files = state.files.filter((file) => file.id !== fileId);
-  state.notes = state.notes.map((note) => ({
-    ...note,
-    fileIds: (note.fileIds || []).filter((id) => id !== fileId),
-  }));
-  saveState();
+async function deleteFile(fileId) {
+  if (syncOn()) {
+    const r = await apiJson("DELETE", `/api/file/${fileId}`);
+    if (!r.ok) {
+      return;
+    }
+    await pullState();
+  } else {
+    state.files = state.files.filter((file) => file.id !== fileId);
+    state.notes = state.notes.map((note) => ({
+      ...note,
+      fileIds: (note.fileIds || []).filter((id) => id !== fileId),
+    }));
+    saveState();
+  }
   renderFiles();
   renderNotes();
   renderHomeFiles();
   renderHomeNotes();
 }
 
-function saveProfile(form) {
+async function saveProfile(form) {
   const formData = new FormData(form);
-  state.user = {
-    ...state.user,
-    name: formData.get("profileName").trim(),
-    email: formData.get("profileEmail").trim(),
-    reminderPreference: formData.get("profileReminderPreference"),
-  };
-  saveState();
+  const rem = formData.get("profileReminderPreference");
+  if (syncOn()) {
+    const r = await apiJson("POST", "/api/profile", {
+      name: formData.get("profileName").toString().trim(),
+      email: formData.get("profileEmail").toString().trim(),
+      password: formData.get("profilePassword")?.toString().trim() || "",
+    });
+    if (r.ok) {
+      await pullState();
+    }
+    state.user.reminderPreference = rem?.toString() || state.user.reminderPreference;
+    saveState();
+  } else {
+    state.user = {
+      ...state.user,
+      name: formData.get("profileName").trim(),
+      email: formData.get("profileEmail").trim(),
+      reminderPreference: rem,
+    };
+    saveState();
+  }
   renderWelcome();
   renderProfile();
 }
@@ -780,44 +934,11 @@ function setupHomePage() {
 }
 
 function setupAuthPages() {
-  const loginForm = document.querySelector("#loginForm");
-  const signupForm = document.querySelector("#signupForm");
-
-  if (loginForm) {
-    loginForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const formData = new FormData(loginForm);
-      state.user = {
-        ...state.user,
-        email: formData.get("email").trim(),
-      };
-      saveState();
-      window.location.href = "dashboard.html";
-    });
-  }
-
-  if (signupForm) {
-    signupForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const formData = new FormData(signupForm);
-      state.user = {
-        ...state.user,
-        name: formData.get("name").trim(),
-        email: formData.get("email").trim(),
-      };
-      saveState();
-      window.location.href = "dashboard.html";
-    });
-  }
+  /* login/signup handled server-side (Flask-WTF + Flask-Login) */
 }
 
 function setupDashboardPage() {
-  const logoutButton = document.querySelector("#logoutButton");
-  if (logoutButton) {
-    logoutButton.addEventListener("click", () => {
-      window.location.href = "index.html";
-    });
-  }
+  /* logout is a normal link to /logout */
 }
 
 function setupTasksPage() {
@@ -853,9 +974,9 @@ function setupTasksPage() {
   }
 
   if (taskForm) {
-    taskForm.addEventListener("submit", (event) => {
+    taskForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      addTask(taskForm);
+      await addTask(taskForm);
       taskForm.reset();
       closeTaskForm();
     });
@@ -870,11 +991,11 @@ function setupTasksPage() {
     const deleteButton = event.target.closest("[data-delete-task]");
 
     if (toggleButton) {
-      toggleTask(toggleButton.dataset.toggleTask);
+      void toggleTask(toggleButton.dataset.toggleTask);
     }
 
     if (deleteButton) {
-      deleteTask(deleteButton.dataset.deleteTask);
+      void deleteTask(deleteButton.dataset.deleteTask);
     }
   });
 }
@@ -917,9 +1038,9 @@ function setupNotesPage() {
   }
 
   if (noteForm) {
-    noteForm.addEventListener("submit", (event) => {
+    noteForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      addNote(noteForm);
+      await addNote(noteForm);
       noteForm.reset();
       document.querySelector("#filePreview").innerHTML = "";
       fillLinkSelects();
@@ -964,9 +1085,9 @@ function setupFilesPage() {
   }
 
   if (fileForm) {
-    fileForm.addEventListener("submit", (event) => {
+    fileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      addFile(fileForm);
+      await addFile(fileForm);
       fileForm.reset();
       closeFileForm();
     });
@@ -977,7 +1098,7 @@ function setupFilesPage() {
     const downloadButton = event.target.closest("[data-download-file]");
 
     if (deleteButton) {
-      deleteFile(deleteButton.dataset.deleteFile);
+      void deleteFile(deleteButton.dataset.deleteFile);
     }
 
     if (downloadButton) {
@@ -990,15 +1111,28 @@ function setupProfilePage() {
   const profileForm = document.querySelector("#profileForm");
 
   if (profileForm) {
-    profileForm.addEventListener("submit", (event) => {
+    profileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      saveProfile(profileForm);
+      await saveProfile(profileForm);
     });
   }
 }
 
-function init() {
-  ensureDemoData();
+async function init() {
+  if (syncOn()) {
+    let rem = defaultState.user.reminderPreference;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY + "_prefs");
+      if (raw) {
+        rem = JSON.parse(raw).user?.reminderPreference || rem;
+      }
+    } catch (_) {}
+    await pullState();
+    state.user.reminderPreference = rem;
+  } else {
+    Object.assign(state, loadState());
+    ensureDemoData();
+  }
   fillLinkSelects();
   renderWelcome();
   renderPreview();
@@ -1021,4 +1155,4 @@ function init() {
   setupProfilePage();
 }
 
-init();
+void init();

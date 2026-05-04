@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bcrypt
 import json
 import os
 import urllib.error
@@ -34,6 +35,63 @@ def get_user_by_id(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
         (user_id,),
     )
     return rows[0] if rows else None
+
+
+def update_user_profile(
+    db: AppDatabase,
+    user_id: int,
+    name: str,
+    email: str,
+    password_plain: Optional[str] = None,
+) -> int:
+    n, e = name.strip(), email.strip()
+    if password_plain and password_plain.strip():
+        pw = hash_password(password_plain.strip())
+        return db.execute_write(
+            "UPDATE users SET `name`=%s, `email`=%s, `password`=%s WHERE `userID`=%s",
+            (n, e, pw, user_id),
+        )
+    return db.execute_write(
+        "UPDATE users SET `name`=%s, `email`=%s WHERE `userID`=%s",
+        (n, e, user_id),
+    )
+
+
+def get_user_by_email(db: AppDatabase, email: str) -> Optional[dict[str, Any]]:
+    rows = db.query(
+        "SELECT `userID`, `name`, `password`, `email` FROM users WHERE `email` = %s",
+        (email.strip(),),
+    )
+    return rows[0] if rows else None
+
+
+def hash_password(plain: str) -> str:
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def check_password(plain: str, stored: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), stored.encode("utf-8"))
+    except ValueError:
+        return False
+
+
+def create_user_account(db: AppDatabase, name: str, email: str, password: str) -> tuple[bool, str]:
+    name_clean, email_clean = name.strip(), email.strip()
+    if not name_clean or not email_clean or not password:
+        return False, "Name, email, and password are required."
+    if get_user_by_email(db, email_clean):
+        return False, "That email is already registered."
+    pw = hash_password(password)
+    new_id = db.execute_write(
+        "INSERT INTO users (`name`, `password`, `email`) VALUES (%s, %s, %s)",
+        (name_clean, pw, email_clean),
+    )
+    uid = int(new_id) if new_id else None
+    if uid is None:
+        return False, "Could not create account."
+    upsert_premium(db, uid, "N", "", None, "none", 0.0)
+    return True, "ok"
 
 
 def get_premium(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
@@ -77,6 +135,25 @@ def list_tasks(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
         "`reminder_freq_day`, `reminder_freq_hour`, `tags` FROM tasks WHERE `userID` = %s "
         "ORDER BY `date_created` DESC",
         (user_id,),
+    )
+
+
+def get_task(db: AppDatabase, user_id: int, task_id: int) -> Optional[dict[str, Any]]:
+    rows = db.query(
+        "SELECT `taskID`, `userID`, `task_name`, `status`, `due_date`, `date_created`, `last_reminder_date`, "
+        "`reminder_freq_day`, `reminder_freq_hour`, `tags` FROM tasks WHERE `userID` = %s AND `taskID` = %s",
+        (user_id, task_id),
+    )
+    return rows[0] if rows else None
+
+
+def set_task_reminders(
+    db: AppDatabase, user_id: int, task_id: int, reminder_freq_day: Optional[int], reminder_freq_hour: Optional[int]
+) -> int:
+    return db.execute_write(
+        "UPDATE tasks SET `reminder_freq_day` = %s, `reminder_freq_hour` = %s "
+        "WHERE `taskID` = %s AND `userID` = %s",
+        (reminder_freq_day, reminder_freq_hour, task_id, user_id),
     )
 
 
@@ -167,6 +244,15 @@ def list_notes(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     )
 
 
+def get_note(db: AppDatabase, user_id: int, note_id: int) -> Optional[dict[str, Any]]:
+    rows = db.query(
+        "SELECT `noteID`, `userID`, `date_time`, `note_title`, `contents` FROM notes "
+        "WHERE `userID` = %s AND `noteID` = %s",
+        (user_id, note_id),
+    )
+    return rows[0] if rows else None
+
+
 def create_note(db: AppDatabase, user_id: int, note_title: str, contents: str) -> int:
     sql = """
         INSERT INTO notes (`userID`, `date_time`, `note_title`, `contents`)
@@ -199,6 +285,10 @@ def update_note(
 
 def delete_note(db: AppDatabase, user_id: int, note_id: int) -> int:
     db.execute_write(
+        "DELETE FROM note_files WHERE `noteID` = %s AND `userID` = %s",
+        (note_id, user_id),
+    )
+    db.execute_write(
         "DELETE FROM task_notes WHERE `noteID` = %s AND `userID` = %s",
         (note_id, user_id),
     )
@@ -227,13 +317,32 @@ def _read_bytes_from_local_reference(local_file_address: str) -> Optional[bytes]
     return p.read_bytes()
 
 
-def create_file_record(db: AppDatabase, user_id: int, link: str, local_file_address: str) -> int:
+def create_file_record(
+    db: AppDatabase,
+    user_id: int,
+    link: str,
+    local_file_address: str,
+    note_id: Optional[int] = None,
+) -> int:
     sql = """
         INSERT INTO files (`userID`, `link`, `local_file_address`)
         VALUES (%s, %s, %s)
     """
     path_str = (local_file_address or "").strip()
     file_id = db.execute_write(sql, (user_id, link, path_str))
+    fid = int(file_id)
+    if note_id is not None:
+        try:
+            nid = int(note_id)
+        except (TypeError, ValueError):
+            nid = None
+        if nid is not None:
+            ok = db.query(
+                "SELECT 1 FROM notes WHERE `userID` = %s AND `noteID` = %s LIMIT 1",
+                (user_id, nid),
+            )
+            if ok:
+                link_note_to_file(db, user_id, nid, fid)
     if path_str.lower().endswith(".pdf"):
         data = _read_bytes_from_local_reference(path_str)
         if data:
@@ -242,10 +351,14 @@ def create_file_record(db: AppDatabase, user_id: int, link: str, local_file_addr
             if not ok:
                 body = f"PDF note import failed: {body}"
             create_note(db, user_id, title[:255], body)
-    return file_id
+    return fid
 
 
 def delete_file_record(db: AppDatabase, user_id: int, file_id: int) -> int:
+    db.execute_write(
+        "DELETE FROM note_files WHERE `fileID` = %s AND `userID` = %s",
+        (file_id, user_id),
+    )
     db.execute_write(
         "DELETE FROM task_files WHERE `fileID` = %s AND `userID` = %s",
         (file_id, user_id),
@@ -299,6 +412,42 @@ def link_task_to_file(db: AppDatabase, user_id: int, task_id: int, file_id: int)
         ON DUPLICATE KEY UPDATE `userID` = VALUES(`userID`)
     """
     return db.execute_write(sql, (user_id, task_id, file_id))
+
+
+def link_note_to_file(db: AppDatabase, user_id: int, note_id: int, file_id: int) -> int:
+    sql = """
+        INSERT INTO note_files (`userID`, `noteID`, `fileID`)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE `userID` = VALUES(`userID`)
+    """
+    return db.execute_write(sql, (user_id, note_id, file_id))
+
+
+def unlink_note_from_file(db: AppDatabase, user_id: int, note_id: int, file_id: int) -> int:
+    return db.execute_write(
+        "DELETE FROM note_files WHERE `userID` = %s AND `noteID` = %s AND `fileID` = %s",
+        (user_id, note_id, file_id),
+    )
+
+
+def files_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str, Any]]:
+    sql = """
+        SELECT f.`fileID`, f.`userID`, f.`link`, f.`local_file_address`
+        FROM files f
+        INNER JOIN note_files nf ON f.`fileID` = nf.`fileID` AND f.`userID` = nf.`userID`
+        WHERE nf.`userID` = %s AND nf.`noteID` = %s
+    """
+    return db.query(sql, (user_id, note_id))
+
+
+def notes_for_file(db: AppDatabase, user_id: int, file_id: int) -> list[dict[str, Any]]:
+    sql = """
+        SELECT n.`noteID`, n.`userID`, n.`date_time`, n.`note_title`, n.`contents`
+        FROM notes n
+        INNER JOIN note_files nf ON n.`noteID` = nf.`noteID` AND n.`userID` = nf.`userID`
+        WHERE nf.`userID` = %s AND nf.`fileID` = %s
+    """
+    return db.query(sql, (user_id, file_id))
 
 
 def unlink_task_from_file(db: AppDatabase, user_id: int, task_id: int, file_id: int) -> int:

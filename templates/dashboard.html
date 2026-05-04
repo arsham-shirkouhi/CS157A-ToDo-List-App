@@ -10,9 +10,9 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="static/assets/css/styles.css" />
+    <link rel="stylesheet" href="/static/assets/css/styles.css" />
   </head>
-  <body>
+  <body data-sync="true" data-csrf="{{ csrf_token_value }}">
     <div class="page-shell">
       <header class="topbar">
         <a class="brand" href="/home">
@@ -33,7 +33,7 @@
         </nav>
 
         <div class="topbar-actions">
-          <button class="ghost-button" href="/logout" id="logoutButton" type="button">Log Out</button>
+          <a class="ghost-button" href="{{ url_for('logout') }}">Log Out</a>
         </div>
       </header>
 
@@ -41,9 +41,9 @@
         <section class="section-title">
           <div>
             <p class="eyebrow">Dashboard</p>
-            <h1>Welcome, <span data-user-name>Guest User</span></h1>
+            <h1>Welcome, <span data-user-name>{{ current_user.name }}</span></h1>
           </div>
-          <p class="muted">Signed in as <span data-user-email>guest@example.com</span></p>
+          <p class="muted">Signed in as <span data-user-email>{{ current_user.email }}</span></p>
         </section>
 
         <section class="stats-grid footer-space">
@@ -105,6 +105,6 @@
       </main>
     </div>
 
-    <script src="static/assets/js/script.js"></script>
+    <script src="/static/assets/js/script.js"></script>
   </body>
 </html>

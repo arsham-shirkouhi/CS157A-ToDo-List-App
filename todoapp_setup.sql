@@ -1,4 +1,5 @@
-USE todoapp;
+-- Use the same database as DB_NAME in .env (e.g. defaultdb on Aiven).
+USE defaultdb;
 
 CREATE TABLE IF NOT EXISTS users (
 	userID INT AUTO_INCREMENT PRIMARY KEY,
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS premium (
     billing_address VARCHAR(255),
     re_bill_date DATETIME,
     payment VARCHAR(255),
+    amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     FOREIGN KEY (userID) REFERENCES users(userID)
 );
 
@@ -67,5 +69,29 @@ CREATE TABLE IF NOT EXISTS task_notes (
     -- link to composite key in notes
     CONSTRAINT fk_tn_note 
         FOREIGN KEY (noteID, userID) REFERENCES notes(noteID, userID)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS task_files (
+    userID INT NOT NULL,
+    taskID INT NOT NULL,
+    fileID INT NOT NULL,
+    PRIMARY KEY (taskID, fileID),
+    CONSTRAINT fk_tf_user FOREIGN KEY (userID) REFERENCES users(userID),
+    CONSTRAINT fk_tf_task FOREIGN KEY (taskID, userID) REFERENCES tasks(taskID, userID)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_tf_file FOREIGN KEY (fileID, userID) REFERENCES files(fileID, userID)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS note_files (
+    userID INT NOT NULL,
+    noteID INT NOT NULL,
+    fileID INT NOT NULL,
+    PRIMARY KEY (noteID, fileID),
+    CONSTRAINT fk_nf_user FOREIGN KEY (userID) REFERENCES users(userID),
+    CONSTRAINT fk_nf_note FOREIGN KEY (noteID, userID) REFERENCES notes(noteID, userID)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_nf_file FOREIGN KEY (fileID, userID) REFERENCES files(fileID, userID)
         ON DELETE CASCADE ON UPDATE CASCADE
 );

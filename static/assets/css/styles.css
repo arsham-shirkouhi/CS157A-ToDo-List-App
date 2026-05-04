@@ -424,6 +424,21 @@ textarea {
   margin: 0 0 6px;
 }
 
+.note-title a,
+.task-title a {
+  color: var(--primary);
+}
+
+.note-title a:hover,
+.task-title a:hover {
+  text-decoration: underline;
+}
+
+.text-danger {
+  margin: 0 0 1rem;
+  color: var(--danger);
+}
+
 .task-text,
 .note-text {
   margin: 10px 0 0;
