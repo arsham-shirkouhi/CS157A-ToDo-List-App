@@ -2,12 +2,13 @@ from flask import Flask, request, render_template
 import os
 import dotenv
 import pymysql
-from flask_login import login_user, LoginManager, login_required, logout_user, current_user
+"""from flask_login import login_user, LoginManager, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import InputRequired, Length, ValidationError
-from flask_bcrypt import Bcrypt
+from flask_bcrypt import Bcrypt"""
 import database
+import application_layer as apl
 
 
 app = Flask(__name__, template_folder = 'templates')
@@ -22,6 +23,14 @@ database.setup_db()
 @app.route('/home')
 def home():
     return render_template('index.html', methods=['POST'])
+
+@app.route('/tasks')
+def tasks():
+    return render_template('tasks.html', methods=['POST'])
+
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html', methods=['POST'])
 
 @app.route('/notes')
 def notes():
@@ -43,6 +52,9 @@ def signup():
 def login():
     return render_template('login.html', methods=['POST'])
 
+@app.route('/logout')
+def logout():    
+    return render_template('/home', methods=['POST'])
 
 
 if __name__ == '__main__':
