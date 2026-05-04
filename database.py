@@ -62,6 +62,7 @@ class Database:
                     `taskID` INT AUTO_INCREMENT,
                     `userID` INT NOT NULL,
                     `task_name` VARCHAR(255),
+                    `status` CHAR,
                     `due_date` DATETIME,
                     `date_created` DATETIME,
                     `last_reminder_date` DATETIME,
@@ -106,6 +107,7 @@ class Database:
                 `billing_address` VARCHAR(255),
                 `re_bill_date` DATETIME,
                 `payment` VARCHAR(255),
+                `amount` DECIMAL(10, 2),
                 FOREIGN KEY (`userID`) REFERENCES `users`(`userID`)
             )
             """)
