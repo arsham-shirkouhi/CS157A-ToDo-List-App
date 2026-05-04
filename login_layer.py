@@ -4,7 +4,7 @@ from typing import Any, Optional, Tuple
 
 import bcrypt
 
-from application_layer import AppDatabase
+from application_layer import AppDatabase, insert_default_premium_for_user
 
 
 def _hash_password(plain: str) -> str:
@@ -42,7 +42,10 @@ def create_user(db: AppDatabase, name: str, email: str, plain_password: str) -> 
         "INSERT INTO users (`name`, `password`, `email`) VALUES (%s, %s, %s)",
         (name.strip(), pw, email_clean),
     )
-    return True, "Account created.", int(new_id) if new_id else None
+    uid = int(new_id) if new_id else None
+    if uid is not None:
+        insert_default_premium_for_user(db, uid)
+    return True, "Account created.", uid
 
 
 def verify_credentials(db: AppDatabase, email: str, plain_password: str) -> Optional[dict[str, Any]]:

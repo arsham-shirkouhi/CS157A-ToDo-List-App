@@ -1,8 +1,3 @@
-"""
-Application layer: business rules and database operations for the todo app.
-Uses the existing Database pool from database.py; subclasses add committed writes.
-"""
-
 from __future__ import annotations
 
 import json
@@ -10,14 +5,13 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from database import Database
 
 
 class AppDatabase(Database):
-    """Same as Database, plus INSERT/UPDATE/DELETE with commit."""
-
     def execute_write(self, sql: str, params: Optional[tuple] = None) -> int:
         conn = self.pool.connection()
         try:
@@ -34,7 +28,7 @@ def _now_sql() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-# --- Users / premium (user table helpers live mostly in login_layer) ---
+# --- Users ---
 
 
 def get_user_by_id(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
@@ -47,11 +41,26 @@ def get_user_by_id(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
 
 def get_premium(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
     rows = db.query(
-        "SELECT `userID`, `account_status`, `billing_address`, `re_bill_date`, `payment` "
+        "SELECT `userID`, `account_status`, `billing_address`, `re_bill_date`, `payment`, `amount` "
         "FROM premium WHERE `userID` = %s",
         (user_id,),
     )
     return rows[0] if rows else None
+
+
+def insert_default_premium_for_user(db: AppDatabase, user_id: int) -> int:
+    """
+    Create one `premium` row for a new user. Defaults only (no billing UI).
+    `payment` holds payment method; free tier uses placeholder values.
+    """
+    return db.execute_write(
+        """
+        INSERT INTO premium (`userID`, `account_status`, `billing_address`, `re_bill_date`, `payment`, `amount`)
+        VALUES (%s, 'N', '', NULL, 'none', 0.00)
+        ON DUPLICATE KEY UPDATE `userID` = `userID`
+        """,
+        (user_id,),
+    )
 
 
 def upsert_premium(
@@ -61,20 +70,22 @@ def upsert_premium(
     billing_address: str = "",
     re_bill_date: Optional[str] = None,
     payment: str = "",
+    amount: float = 0.0,
 ) -> int:
     sql = """
-        INSERT INTO premium (`userID`, `account_status`, `billing_address`, `re_bill_date`, `payment`)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO premium (`userID`, `account_status`, `billing_address`, `re_bill_date`, `payment`, `amount`)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             `account_status` = VALUES(`account_status`),
             `billing_address` = VALUES(`billing_address`),
             `re_bill_date` = VALUES(`re_bill_date`),
-            `payment` = VALUES(`payment`)
+            `payment` = VALUES(`payment`),
+            `amount` = VALUES(`amount`)
     """
     status_char = (account_status or "N")[:1]
     return db.execute_write(
         sql,
-        (user_id, status_char, billing_address, re_bill_date, payment),
+        (user_id, status_char, billing_address, re_bill_date, payment, amount),
     )
 
 
@@ -83,7 +94,7 @@ def upsert_premium(
 
 def list_tasks(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     return db.query(
-        "SELECT `taskID`, `userID`, `task_name`, `due_date`, `date_created`, `last_reminder_date`, "
+        "SELECT `taskID`, `userID`, `task_name`, `status`, `due_date`, `date_created`, `last_reminder_date`, "
         "`reminder_freq_day`, `reminder_freq_hour`, `tags` FROM tasks WHERE `userID` = %s "
         "ORDER BY `date_created` DESC",
         (user_id,),
@@ -98,15 +109,18 @@ def create_task(
     tags: Optional[str] = None,
     reminder_freq_day: Optional[int] = None,
     reminder_freq_hour: Optional[int] = None,
+    status: str = "A",
 ) -> int:
+    """``status`` is a single CHAR, e.g. ``A`` active, ``C`` completed (your app can define meanings)."""
     sql = """
-        INSERT INTO tasks (`userID`, `task_name`, `due_date`, `date_created`, `last_reminder_date`,
+        INSERT INTO tasks (`userID`, `task_name`, `status`, `due_date`, `date_created`, `last_reminder_date`,
             `reminder_freq_day`, `reminder_freq_hour`, `tags`)
-        VALUES (%s, %s, %s, %s, NULL, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, NULL, %s, %s, %s)
     """
+    st = (status or "A")[:1]
     return db.execute_write(
         sql,
-        (user_id, task_name, due_date, _now_sql(), reminder_freq_day, reminder_freq_hour, tags),
+        (user_id, task_name, st, due_date, _now_sql(), reminder_freq_day, reminder_freq_hour, tags),
     )
 
 
@@ -120,12 +134,16 @@ def update_task(
     last_reminder_date: Optional[str] = None,
     reminder_freq_day: Optional[int] = None,
     reminder_freq_hour: Optional[int] = None,
+    status: Optional[str] = None,
 ) -> int:
     fields: list[str] = []
     values: list[Any] = []
     if task_name is not None:
         fields.append("`task_name` = %s")
         values.append(task_name)
+    if status is not None:
+        fields.append("`status` = %s")
+        values.append((status or "A")[:1])
     if due_date is not None:
         fields.append("`due_date` = %s")
         values.append(due_date)
@@ -151,6 +169,10 @@ def update_task(
 def delete_task(db: AppDatabase, user_id: int, task_id: int) -> int:
     db.execute_write(
         "DELETE FROM task_notes WHERE `taskID` = %s AND `userID` = %s",
+        (task_id, user_id),
+    )
+    db.execute_write(
+        "DELETE FROM task_files WHERE `taskID` = %s AND `userID` = %s",
         (task_id, user_id),
     )
     return db.execute_write(
@@ -221,15 +243,52 @@ def list_files(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     )
 
 
+def _read_bytes_from_local_reference(local_file_address: str) -> Optional[bytes]:
+    """Load file bytes from a path stored in `local_file_address` (absolute or relative to cwd)."""
+    raw = (local_file_address or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    if not p.is_file():
+        p = Path.cwd() / raw
+    if not p.is_file():
+        return None
+    return p.read_bytes()
+
+
+def _maybe_create_note_from_pdf(db: AppDatabase, user_id: int, local_file_address: str) -> None:
+    path_str = (local_file_address or "").strip()
+    if not path_str.lower().endswith(".pdf"):
+        return
+    pdf_bytes = _read_bytes_from_local_reference(path_str)
+    if not pdf_bytes:
+        return
+    title = f"Notes from {Path(path_str).name}"
+    ok, body = pdf_bytes_to_study_notes(pdf_bytes)
+    if not ok:
+        body = (
+            f"(PDF conversion did not produce AI notes. Reason: {body})\n\n"
+            "You can still open the original file using the stored path or link."
+        )
+    create_note(db, user_id, title[:255], body)
+
+
 def create_file_record(db: AppDatabase, user_id: int, link: str, local_file_address: str) -> int:
     sql = """
         INSERT INTO files (`userID`, `link`, `local_file_address`)
         VALUES (%s, %s, %s)
     """
-    return db.execute_write(sql, (user_id, link, local_file_address))
+    path_str = (local_file_address or "").strip()
+    file_id = db.execute_write(sql, (user_id, link, local_file_address))
+    _maybe_create_note_from_pdf(db, user_id, path_str)
+    return file_id
 
 
 def delete_file_record(db: AppDatabase, user_id: int, file_id: int) -> int:
+    db.execute_write(
+        "DELETE FROM task_files WHERE `fileID` = %s AND `userID` = %s",
+        (file_id, user_id),
+    )
     return db.execute_write(
         "DELETE FROM files WHERE `fileID` = %s AND `userID` = %s",
         (file_id, user_id),
@@ -267,7 +326,7 @@ def notes_for_task(db: AppDatabase, user_id: int, task_id: int) -> list[dict[str
 
 def tasks_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str, Any]]:
     sql = """
-        SELECT t.`taskID`, t.`userID`, t.`task_name`, t.`due_date`, t.`date_created`, t.`tags`
+        SELECT t.`taskID`, t.`userID`, t.`task_name`, t.`status`, t.`due_date`, t.`date_created`, t.`tags`
         FROM tasks t
         INNER JOIN task_notes tn ON t.`taskID` = tn.`taskID` AND t.`userID` = tn.`userID`
         WHERE tn.`userID` = %s AND tn.`noteID` = %s
@@ -275,7 +334,46 @@ def tasks_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str
     return db.query(sql, (user_id, note_id))
 
 
-# --- PDF → note text (optional OpenAI; optional pypdf for extraction) ---
+# --- Task–file links (`task_files`) ---
+
+
+def link_task_to_file(db: AppDatabase, user_id: int, task_id: int, file_id: int) -> int:
+    sql = """
+        INSERT INTO task_files (`userID`, `taskID`, `fileID`)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE `userID` = VALUES(`userID`)
+    """
+    return db.execute_write(sql, (user_id, task_id, file_id))
+
+
+def unlink_task_from_file(db: AppDatabase, user_id: int, task_id: int, file_id: int) -> int:
+    return db.execute_write(
+        "DELETE FROM task_files WHERE `userID` = %s AND `taskID` = %s AND `fileID` = %s",
+        (user_id, task_id, file_id),
+    )
+
+
+def files_for_task(db: AppDatabase, user_id: int, task_id: int) -> list[dict[str, Any]]:
+    sql = """
+        SELECT f.`fileID`, f.`userID`, f.`link`, f.`local_file_address`
+        FROM files f
+        INNER JOIN task_files tf ON f.`fileID` = tf.`fileID` AND f.`userID` = tf.`userID`
+        WHERE tf.`userID` = %s AND tf.`taskID` = %s
+    """
+    return db.query(sql, (user_id, task_id))
+
+
+def tasks_for_file(db: AppDatabase, user_id: int, file_id: int) -> list[dict[str, Any]]:
+    sql = """
+        SELECT t.`taskID`, t.`userID`, t.`task_name`, t.`status`, t.`due_date`, t.`date_created`, t.`tags`
+        FROM tasks t
+        INNER JOIN task_files tf ON t.`taskID` = tf.`taskID` AND t.`userID` = tf.`userID`
+        WHERE tf.`userID` = %s AND tf.`fileID` = %s
+    """
+    return db.query(sql, (user_id, file_id))
+
+
+# --- PDF → note text ---
 
 
 def _extract_pdf_text(pdf_bytes: bytes) -> tuple[bool, str]:
@@ -296,10 +394,42 @@ def _extract_pdf_text(pdf_bytes: bytes) -> tuple[bool, str]:
     return True, text
 
 
+def _format_plain_text_as_markdown_notes(raw_text: str) -> str:
+    """
+    Turn extracted PDF text into simple markdown notes using only the standard library.
+    """
+    text = raw_text.strip()
+    if not text:
+        return "_No extractable text to format._"
+
+    parts = [
+        "# Notes from PDF",
+        "",
+        "_Extracted locally (open source: [pypdf](https://github.com/py-pdf/pypdf))._",
+        "_Optional: set `OPENAI_API_KEY` to also try an AI pass after extraction._",
+        "",
+    ]
+
+    blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
+    if not blocks:
+        blocks = [text]
+
+    for i, block in enumerate(blocks[:150], start=1):
+        parts.append(f"## Part {i}")
+        parts.append("")
+        parts.append(block[:12_000])
+        parts.append("")
+
+    body = "\n".join(parts).strip()
+    if len(body) > 100_000:
+        body = body[:99_997] + "\n\n…"
+    return body
+
+
 def _openai_summarize_to_notes(raw_text: str) -> tuple[bool, str]:
     key = os.getenv("OPENAI_API_KEY")
     if not key:
-        return False, "Set OPENAI_API_KEY to use AI note conversion."
+        return False, "OpenAI not configured (no OPENAI_API_KEY)."
 
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     body = {
@@ -342,10 +472,19 @@ def _openai_summarize_to_notes(raw_text: str) -> tuple[bool, str]:
 
 def pdf_bytes_to_study_notes(pdf_bytes: bytes) -> tuple[bool, str]:
     """
-    Extract text from a PDF, then ask OpenAI to format it as study notes.
+    Extract text with pypdf (BSD-style OSS), then either:
+    - format as markdown locally (no API key), or
+    - if ``OPENAI_API_KEY`` is set, try OpenAI first and fall back to local formatting on failure.
+
     Returns (success, message_or_note_body).
     """
     ok, text_or_err = _extract_pdf_text(pdf_bytes)
     if not ok:
         return False, text_or_err
-    return _openai_summarize_to_notes(text_or_err)
+
+    if os.getenv("OPENAI_API_KEY"):
+        ai_ok, ai_out = _openai_summarize_to_notes(text_or_err)
+        if ai_ok:
+            return True, ai_out
+
+    return True, _format_plain_text_as_markdown_notes(text_or_err)
