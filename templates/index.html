@@ -1,122 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TaskFlow | Home</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/assets/css/styles.css" />
-  </head>
-  <body>
-    <div class="page-shell">
-      <header class="topbar">
-        <a class="brand" href="/home">
-          <span class="brand-mark">TF</span>
-          <span class="brand-copy">
-            <strong>TaskFlow</strong>
-            <small>Simple to-do and notes app</small>
-          </span>
-        </a>
 
-        <nav class="nav-links">
-          <a class="active" href="/home">Home</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/tasks">Tasks</a>
-          <a href="/notes">Notes</a>
-          <a href="/files">Files</a>
-          <a href="/profile">Profile</a>
-        </nav>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow | Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/assets/css/styles.css" />
+  <style>
+    body {
+      min-height: 100vh;
+    }
 
-        <div class="topbar-actions">
-          <a class="ghost-button" href="/login">Log In</a>
-          <a class="primary-button" href="/signup">Sign Up</a>
+    .page-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    main {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .hero {
+      width: min(900px, 100%);
+      margin-bottom: 0;
+    }
+
+    .button-row {
+      justify-content: center;
+    }
+
+    .hero > div:first-child {
+      text-align: left;
+    }
+
+    .hero > div:first-child .button-row {
+      justify-content: flex-start;
+    }
+
+    .hero-points {
+      list-style-position: inside;
+      padding-left: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-shell">
+    <main>
+      <section class="hero">
+        <div>
+          <h1>Task Flow</h1>
+          <p>
+            Keep track of tasks, notes, and reminders.
+          </p>
+
+          <div class="button-row">
+            <a class="ghost-button" href="/login">Log In</a>
+            <a class="primary-button" href="/signup">Sign Up</a>
+          </div>
+
+          <ul class="hero-points">
+            <li>Create and organize tasks by due date</li>
+            <li>Save notes for classes, projects, and work</li>
+            <li>Preview file uploads before any backend is built</li>
+          </ul>
         </div>
-      </header>
 
-      <main>
-        <section class="hero">
-          <div>
-            <h1>Keep track of tasks, notes, and reminders.</h1>
-            <p>
-              TaskFlow is a simple website concept for students, note takers,
-              and busy users who want one place for planning work and staying on
-              schedule.
-            </p>
+        <div class="card">
+          <p class="eyebrow">Preview</p>
+          <h2>What the app does</h2>
+          <p class="muted">You can create tasks, notes, and files.</p>
+          <div id="homePreviewList" class="preview-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
 
-            <div class="button-row">
-              <a class="primary-button" href="/signup">Get Started</a>
-              <a class="secondary-button" href="/dashboard">View Dashboard</a>
-            </div>
+  <script src="/static/assets/js/script.js"></script>
+</body>
 
-            <ul class="hero-points">
-              <li>Create and organize tasks by due date</li>
-              <li>Save notes for classes, projects, and work</li>
-              <li>Preview file uploads before any backend is built</li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <p class="eyebrow">Preview</p>
-            <h2>What the app does</h2>
-            <p class="muted">Start with the main app sections first, then look at the extra features below.</p>
-            <div id="homePreviewList" class="preview-list"></div>
-          </div>
-        </section>
-
-        <section class="section-title">
-          <div>
-            <p class="eyebrow">Main App Preview</p>
-            <h2>To-do list, notes, and files</h2>
-          </div>
-        </section>
-
-        <section class="content-grid footer-space">
-          <article class="card">
-            <h2>To-Do List</h2>
-            <p class="muted">Upcoming tasks from the app.</p>
-            <div id="homeTasksList" class="list-stack"></div>
-          </article>
-
-          <article class="card">
-            <h2>Notes</h2>
-            <p class="muted">Recent saved notes and linked work.</p>
-            <div id="homeNotesList" class="list-stack"></div>
-          </article>
-        </section>
-
-        <section class="card footer-space">
-          <div class="section-title">
-            <div>
-              <p class="eyebrow">Files</p>
-              <h2>Uploaded file preview</h2>
-            </div>
-            <a class="secondary-button" href="/files">Open Files Page</a>
-          </div>
-          <div id="homeFilesList" class="uploads-list"></div>
-        </section>
-
-        <section class="feature-grid feature-grid-secondary footer-space">
-          <article class="feature-card">
-            <h2>Task Tracking</h2>
-            <p class="muted">Add due dates, reminders, tags, and short descriptions.</p>
-          </article>
-          <article class="feature-card">
-            <h2>Notes</h2>
-            <p class="muted">Write quick notes and connect them to existing tasks.</p>
-          </article>
-          <article class="feature-card">
-            <h2>Files</h2>
-            <p class="muted">Show uploaded file names and links in a clean frontend UI.</p>
-          </article>
-        </section>
-      </main>
-    </div>
-
-    <script src="/static/assets/js/script.js"></script>
-  </body>
 </html>
