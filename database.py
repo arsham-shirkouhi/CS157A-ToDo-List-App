@@ -9,12 +9,14 @@ import pymysql.err
 dotenv.load_dotenv(override=True)
 
 
+# DB name from env, else defaultdb. No I/O; cannot error.
 def _db_name() -> str:
     n = (os.getenv("DB_NAME") or "").strip().strip("'\"")
     return n if n else "defaultdb"
 
 
 class Database:
+    # Open PyMySQL pool. Errors: unknown DB (1049) -> RuntimeError with hint; other OperationalError re-raised.
     def __init__(self):
         try:
             self.pool = PooledDB(
@@ -41,6 +43,7 @@ class Database:
                 ) from e
             raise
 
+    # Run SELECT-style SQL; returns rows. Connection always closed in finally; DB errors propagate.
     def query(self, sql, params=None):
         connection = self.pool.connection()
         try:
@@ -50,6 +53,7 @@ class Database:
         finally:
             connection.close()
 
+    # Create/upgrade tables if missing. Connection closed in finally; DDL/SQL errors propagate.
     def setup_db(self):
         try:
             connection = self.pool.connection()

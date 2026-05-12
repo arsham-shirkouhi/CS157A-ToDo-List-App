@@ -22,11 +22,13 @@ db.setup_db()
 csrf = CSRFProtect(app)
 
 
+# Expose CSRF token to all templates.
 @app.context_processor
 def _csrf():
     return {"csrf_token_value": generate_csrf()}
 
 
+# Format DB datetime/date for UI strings; bad types fall back to str().
 def _fmt_dt(v: Any) -> str:
     if v is None:
         return ""
@@ -37,11 +39,13 @@ def _fmt_dt(v: Any) -> str:
     return str(v)
 
 
+# Due date as YYYY-MM-DD only for HTML date inputs.
 def _due_ui(v: Any) -> str:
     s = _fmt_dt(v)
     return s.split()[0] if s else ""
 
 
+# Map reminder label to (day_freq, hour_freq) tuple for DB.
 def _rem_from_ui(s: str) -> tuple[Optional[int], Optional[int]]:
     t = (s or "").lower()
     if "daily" in t:
@@ -53,6 +57,7 @@ def _rem_from_ui(s: str) -> tuple[Optional[int], Optional[int]]:
     return None, None
 
 
+# DB reminder columns -> Daily / Weekly / Custom for forms; bad ints ignored via try/except.
 def _reminder_form_value(r: dict[str, Any]) -> str:
     rd, rh = r.get("reminder_freq_day"), r.get("reminder_freq_hour")
     if not rd and not rh:
@@ -67,6 +72,7 @@ def _reminder_form_value(r: dict[str, Any]) -> str:
     return "Custom"
 
 
+# One task row for JSON state; DB reads via apl propagate on failure.
 def _task_row_ui(uid: int, r: dict[str, Any]) -> dict[str, Any]:
     st = (r.get("status") or "A").strip().upper()
     rd, rh = r.get("reminder_freq_day"), r.get("reminder_freq_hour")
@@ -92,6 +98,7 @@ def _task_row_ui(uid: int, r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# One note row for JSON state; DB errors propagate.
 def _note_row_ui(uid: int, r: dict[str, Any]) -> dict[str, Any]:
     nid = int(r["noteID"])
     pairs = apl.tasks_for_note(db, uid, nid)
@@ -107,6 +114,7 @@ def _note_row_ui(uid: int, r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# One file row for JSON state; DB errors propagate.
 def _file_row_ui(uid: int, r: dict[str, Any]) -> dict[str, Any]:
     fid = int(r["fileID"])
     pairs = apl.tasks_for_file(db, uid, fid)
@@ -127,6 +135,7 @@ def _file_row_ui(uid: int, r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# Full /api/state body; DB errors from list_* / get_* propagate (Flask 500 if uncaught).
 def _state_payload(uid: int) -> dict[str, Any]:
     u = apl.get_user_by_id(db, uid)
     pr = apl.get_premium(db, uid)
@@ -147,6 +156,7 @@ def _state_payload(uid: int) -> dict[str, Any]:
 
 
 class User(UserMixin):
+    # Flask-Login user wrapper; no DB.
     def __init__(self, uid: int, name: str, email: str):
         self.id = uid
         self.name = name or ""
@@ -158,6 +168,7 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 
+# Load User from DB by id; missing user -> None (not an error). DB errors propagate.
 @login_manager.user_loader
 def load_user(user_id):
     row = apl.get_user_by_id(db, int(user_id))
@@ -166,12 +177,14 @@ def load_user(user_id):
     return User(int(row["userID"]), str(row["name"] or ""), str(row["email"] or ""))
 
 
+# Login fields; WTForms handles validation errors on submit.
 class LoginForm(FlaskForm):
     email = StringField(validators=[InputRequired(), Length(max=255)])
     password = PasswordField(validators=[InputRequired()])
     submit = SubmitField("Log In")
 
 
+# Signup fields; validate_email raises ValidationError if email taken (form-level, not HTTP 500).
 class RegisterForm(FlaskForm):
     name = StringField(validators=[InputRequired(), Length(max=255)])
     email = StringField(validators=[InputRequired(), Length(max=255)])
@@ -179,11 +192,13 @@ class RegisterForm(FlaskForm):
     confirm = PasswordField(validators=[InputRequired(), EqualTo("password", message="Passwords must match.")])
     submit = SubmitField("Create Account")
 
+    # Reject duplicate email at form validation time.
     def validate_email(self, field):
         if apl.get_user_by_email(db, field.data):
             raise ValidationError("That email is already registered.")
 
 
+# Show/login form; bad creds flash danger; DB errors propagate.
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
@@ -199,6 +214,7 @@ def login():
     return render_template("login.html", form=form)
 
 
+# Show/register; create_user_account returns (ok, msg) on failure; DB insert errors propagate.
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if current_user.is_authenticated:
@@ -213,6 +229,7 @@ def signup():
     return render_template("signup.html", form=form)
 
 
+# End session; no DB.
 @app.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
@@ -220,12 +237,14 @@ def logout():
     return redirect(url_for("home"))
 
 
+# Public home template; no DB.
 @app.route("/")
 @app.route("/home")
 def home():
     return render_template("index.html")
 
 
+# Dashboard with tasks and notes lists; DB errors propagate.
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -234,12 +253,14 @@ def dashboard():
     return render_template("dashboard.html", tasks=tasks, notes=notes)
 
 
+# Tasks page; DB errors propagate.
 @app.route("/tasks")
 @login_required
 def tasks():
     return render_template("tasks.html", tasks=apl.list_tasks(db, current_user.id))
 
 
+# Edit one task; missing row abort(404); validation sets err str; DB update errors propagate.
 @app.route("/tasks/<int:tid>", methods=["GET", "POST"])
 @login_required
 def task_detail(tid: int):
@@ -292,12 +313,14 @@ def task_detail(tid: int):
     )
 
 
+# Notes list page; DB errors propagate.
 @app.route("/notes")
 @login_required
 def notes():
     return render_template("notes.html", notes=apl.list_notes(db, current_user.id))
 
 
+# Edit one note; missing abort(404); empty title re-renders with err; DB errors propagate.
 @app.route("/notes/<int:nid>", methods=["GET", "POST"])
 @login_required
 def note_detail(nid: int):
@@ -328,24 +351,28 @@ def note_detail(nid: int):
     )
 
 
+# Files page; DB errors propagate.
 @app.route("/files")
 @login_required
 def files():
     return render_template("files.html", files=apl.list_files(db, current_user.id))
 
 
+# Profile page; DB errors propagate.
 @app.route("/profile")
 @login_required
 def profile():
     return render_template("profile.html", premium=apl.get_premium(db, current_user.id))
 
 
+# JSON sync payload; DB errors propagate (500 if uncaught).
 @app.get("/api/state")
 @login_required
 def api_state():
     return jsonify(_state_payload(current_user.id))
 
 
+# Create task; 400 if missing name; DB errors propagate.
 @app.post("/api/task")
 @login_required
 def api_task_post():
@@ -368,6 +395,7 @@ def api_task_post():
     return jsonify(ok=True, id=int(tid))
 
 
+# Toggle complete; 400 if body missing completed; DB errors propagate.
 @app.put("/api/task/<int:tid>")
 @login_required
 def api_task_put(tid: int):
@@ -378,6 +406,7 @@ def api_task_put(tid: int):
     return jsonify(ok=True)
 
 
+# Delete task; DB errors propagate.
 @app.delete("/api/task/<int:tid>")
 @login_required
 def api_task_delete(tid: int):
@@ -385,6 +414,7 @@ def api_task_delete(tid: int):
     return jsonify(ok=True)
 
 
+# Create note; 400 if no title; bad task_id int ignored (pass); DB errors propagate.
 @app.post("/api/note")
 @login_required
 def api_note_post():
@@ -403,6 +433,7 @@ def api_note_post():
     return jsonify(ok=True, id=nid)
 
 
+# Create file + links; bad ids coerced to None/skip via try/except; DB errors propagate.
 @app.post("/api/file")
 @login_required
 def api_file_post():
@@ -426,6 +457,7 @@ def api_file_post():
     return jsonify(ok=True, id=fid)
 
 
+# Delete file record; DB errors propagate.
 @app.delete("/api/file/<int:fid>")
 @login_required
 def api_file_delete(fid: int):
@@ -433,6 +465,7 @@ def api_file_delete(fid: int):
     return jsonify(ok=True)
 
 
+# Update profile fields; DB errors propagate.
 @app.post("/api/profile")
 @login_required
 def api_profile_post():
@@ -448,6 +481,7 @@ def api_profile_post():
     return jsonify(ok=True)
 
 
+# Upsert premium; bad amount -> 0.0 via try/except; DB errors propagate.
 @app.post("/api/premium")
 @login_required
 def api_premium_post():

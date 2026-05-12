@@ -13,6 +13,7 @@ from database import Database
 
 
 class AppDatabase(Database):
+    # INSERT/UPDATE/DELETE; commits. Connection closed in finally; DB errors propagate.
     def execute_write(self, sql: str, params: Optional[tuple] = None) -> int:
         conn = self.pool.connection()
         try:
@@ -25,10 +26,12 @@ class AppDatabase(Database):
             conn.close()
 
 
+# Current time string for SQL DATETIME columns.
 def _now_sql() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# Load user row by id or None. DB errors from query propagate.
 def get_user_by_id(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
     rows = db.query(
         "SELECT `userID`, `name`, `email` FROM users WHERE `userID` = %s",
@@ -37,6 +40,7 @@ def get_user_by_id(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
     return rows[0] if rows else None
 
 
+# Update name/email and optionally password. DB errors from execute_write propagate.
 def update_user_profile(
     db: AppDatabase,
     user_id: int,
@@ -57,6 +61,7 @@ def update_user_profile(
     )
 
 
+# Load user by email or None. DB errors propagate.
 def get_user_by_email(db: AppDatabase, email: str) -> Optional[dict[str, Any]]:
     rows = db.query(
         "SELECT `userID`, `name`, `password`, `email` FROM users WHERE `email` = %s",
@@ -65,10 +70,12 @@ def get_user_by_email(db: AppDatabase, email: str) -> Optional[dict[str, Any]]:
     return rows[0] if rows else None
 
 
+# Hash password with bcrypt (CPU-heavy but local; bcrypt errors propagate).
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
+# Verify plain password against stored hash; invalid hash format -> False (no raise).
 def check_password(plain: str, stored: str) -> bool:
     try:
         return bcrypt.checkpw(plain.encode("utf-8"), stored.encode("utf-8"))
@@ -76,6 +83,7 @@ def check_password(plain: str, stored: str) -> bool:
         return False
 
 
+# Register user; returns (ok, message). Validates input first; DB failure on insert propagates.
 def create_user_account(db: AppDatabase, name: str, email: str, password: str) -> tuple[bool, str]:
     name_clean, email_clean = name.strip(), email.strip()
     if not name_clean or not email_clean or not password:
@@ -94,6 +102,7 @@ def create_user_account(db: AppDatabase, name: str, email: str, password: str) -
     return True, "ok"
 
 
+# Load premium row or None. DB errors propagate.
 def get_premium(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
     rows = db.query(
         "SELECT `userID`, `account_status`, `billing_address`, `re_bill_date`, `payment`, `amount` "
@@ -103,6 +112,7 @@ def get_premium(db: AppDatabase, user_id: int) -> Optional[dict[str, Any]]:
     return rows[0] if rows else None
 
 
+# Insert or update premium row. DB errors propagate.
 def upsert_premium(
     db: AppDatabase,
     user_id: int,
@@ -129,6 +139,7 @@ def upsert_premium(
     )
 
 
+# All tasks for user, newest first. DB errors propagate.
 def list_tasks(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     return db.query(
         "SELECT `taskID`, `userID`, `task_name`, `status`, `due_date`, `date_created`, `last_reminder_date`, "
@@ -138,6 +149,7 @@ def list_tasks(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     )
 
 
+# One task row or None. DB errors propagate.
 def get_task(db: AppDatabase, user_id: int, task_id: int) -> Optional[dict[str, Any]]:
     rows = db.query(
         "SELECT `taskID`, `userID`, `task_name`, `status`, `due_date`, `date_created`, `last_reminder_date`, "
@@ -147,6 +159,7 @@ def get_task(db: AppDatabase, user_id: int, task_id: int) -> Optional[dict[str, 
     return rows[0] if rows else None
 
 
+# Set reminder day/hour columns. DB errors propagate.
 def set_task_reminders(
     db: AppDatabase, user_id: int, task_id: int, reminder_freq_day: Optional[int], reminder_freq_hour: Optional[int]
 ) -> int:
@@ -157,6 +170,7 @@ def set_task_reminders(
     )
 
 
+# Insert task; returns lastrowid. DB errors propagate.
 def create_task(
     db: AppDatabase,
     user_id: int,
@@ -179,6 +193,7 @@ def create_task(
     )
 
 
+# Patch task fields; no-op if nothing to set. DB errors propagate.
 def update_task(
     db: AppDatabase,
     user_id: int,
@@ -221,6 +236,7 @@ def update_task(
     return db.execute_write(sql, tuple(values))
 
 
+# Remove task links then task row. DB errors propagate.
 def delete_task(db: AppDatabase, user_id: int, task_id: int) -> int:
     db.execute_write(
         "DELETE FROM task_notes WHERE `taskID` = %s AND `userID` = %s",
@@ -236,6 +252,7 @@ def delete_task(db: AppDatabase, user_id: int, task_id: int) -> int:
     )
 
 
+# All notes for user. DB errors propagate.
 def list_notes(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     return db.query(
         "SELECT `noteID`, `userID`, `date_time`, `note_title`, `contents` FROM notes "
@@ -244,6 +261,7 @@ def list_notes(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     )
 
 
+# One note or None. DB errors propagate.
 def get_note(db: AppDatabase, user_id: int, note_id: int) -> Optional[dict[str, Any]]:
     rows = db.query(
         "SELECT `noteID`, `userID`, `date_time`, `note_title`, `contents` FROM notes "
@@ -253,6 +271,7 @@ def get_note(db: AppDatabase, user_id: int, note_id: int) -> Optional[dict[str, 
     return rows[0] if rows else None
 
 
+# Insert note; returns id. DB errors propagate.
 def create_note(db: AppDatabase, user_id: int, note_title: str, contents: str) -> int:
     sql = """
         INSERT INTO notes (`userID`, `date_time`, `note_title`, `contents`)
@@ -261,6 +280,7 @@ def create_note(db: AppDatabase, user_id: int, note_title: str, contents: str) -
     return db.execute_write(sql, (user_id, _now_sql(), note_title, contents))
 
 
+# Patch note title/body; no-op if empty. DB errors propagate.
 def update_note(
     db: AppDatabase,
     user_id: int,
@@ -283,6 +303,7 @@ def update_note(
     return db.execute_write(sql, tuple(values))
 
 
+# Remove note links then note. DB errors propagate.
 def delete_note(db: AppDatabase, user_id: int, note_id: int) -> int:
     db.execute_write(
         "DELETE FROM note_files WHERE `noteID` = %s AND `userID` = %s",
@@ -298,6 +319,7 @@ def delete_note(db: AppDatabase, user_id: int, note_id: int) -> int:
     )
 
 
+# All file rows for user. DB errors propagate.
 def list_files(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     return db.query(
         "SELECT `fileID`, `userID`, `link`, `local_file_address` FROM files WHERE `userID` = %s",
@@ -305,6 +327,7 @@ def list_files(db: AppDatabase, user_id: int) -> list[dict[str, Any]]:
     )
 
 
+# Read file bytes if path exists; missing file -> None; unreadable path may raise OSError.
 def _read_bytes_from_local_reference(local_file_address: str) -> Optional[bytes]:
     raw = (local_file_address or "").strip()
     if not raw:
@@ -317,6 +340,7 @@ def _read_bytes_from_local_reference(local_file_address: str) -> Optional[bytes]
     return p.read_bytes()
 
 
+# Insert file row; optional note link; PDF may spawn a note. Bad note_id coerced safely; DB errors propagate.
 def create_file_record(
     db: AppDatabase,
     user_id: int,
@@ -354,6 +378,7 @@ def create_file_record(
     return fid
 
 
+# Remove file links then file row. DB errors propagate.
 def delete_file_record(db: AppDatabase, user_id: int, file_id: int) -> int:
     db.execute_write(
         "DELETE FROM note_files WHERE `fileID` = %s AND `userID` = %s",
@@ -369,6 +394,7 @@ def delete_file_record(db: AppDatabase, user_id: int, file_id: int) -> int:
     )
 
 
+# Link task-note row (upsert). DB errors propagate.
 def link_task_to_note(db: AppDatabase, user_id: int, task_id: int, note_id: int) -> int:
     sql = """
         INSERT INTO task_notes (`userID`, `taskID`, `noteID`)
@@ -378,6 +404,7 @@ def link_task_to_note(db: AppDatabase, user_id: int, task_id: int, note_id: int)
     return db.execute_write(sql, (user_id, task_id, note_id))
 
 
+# Delete task-note link. DB errors propagate.
 def unlink_task_from_note(db: AppDatabase, user_id: int, task_id: int, note_id: int) -> int:
     return db.execute_write(
         "DELETE FROM task_notes WHERE `userID` = %s AND `taskID` = %s AND `noteID` = %s",
@@ -385,6 +412,7 @@ def unlink_task_from_note(db: AppDatabase, user_id: int, task_id: int, note_id: 
     )
 
 
+# Notes linked to a task. DB errors propagate.
 def notes_for_task(db: AppDatabase, user_id: int, task_id: int) -> list[dict[str, Any]]:
     sql = """
         SELECT n.`noteID`, n.`userID`, n.`date_time`, n.`note_title`, n.`contents`
@@ -395,6 +423,7 @@ def notes_for_task(db: AppDatabase, user_id: int, task_id: int) -> list[dict[str
     return db.query(sql, (user_id, task_id))
 
 
+# Tasks linked to a note. DB errors propagate.
 def tasks_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str, Any]]:
     sql = """
         SELECT t.`taskID`, t.`userID`, t.`task_name`, t.`status`, t.`due_date`, t.`date_created`, t.`tags`
@@ -405,6 +434,7 @@ def tasks_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str
     return db.query(sql, (user_id, note_id))
 
 
+# Link task-file row. DB errors propagate.
 def link_task_to_file(db: AppDatabase, user_id: int, task_id: int, file_id: int) -> int:
     sql = """
         INSERT INTO task_files (`userID`, `taskID`, `fileID`)
@@ -414,6 +444,7 @@ def link_task_to_file(db: AppDatabase, user_id: int, task_id: int, file_id: int)
     return db.execute_write(sql, (user_id, task_id, file_id))
 
 
+# Link note-file row. DB errors propagate.
 def link_note_to_file(db: AppDatabase, user_id: int, note_id: int, file_id: int) -> int:
     sql = """
         INSERT INTO note_files (`userID`, `noteID`, `fileID`)
@@ -423,6 +454,7 @@ def link_note_to_file(db: AppDatabase, user_id: int, note_id: int, file_id: int)
     return db.execute_write(sql, (user_id, note_id, file_id))
 
 
+# Delete note-file link. DB errors propagate.
 def unlink_note_from_file(db: AppDatabase, user_id: int, note_id: int, file_id: int) -> int:
     return db.execute_write(
         "DELETE FROM note_files WHERE `userID` = %s AND `noteID` = %s AND `fileID` = %s",
@@ -430,6 +462,7 @@ def unlink_note_from_file(db: AppDatabase, user_id: int, note_id: int, file_id: 
     )
 
 
+# Files linked to a note. DB errors propagate.
 def files_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str, Any]]:
     sql = """
         SELECT f.`fileID`, f.`userID`, f.`link`, f.`local_file_address`
@@ -440,6 +473,7 @@ def files_for_note(db: AppDatabase, user_id: int, note_id: int) -> list[dict[str
     return db.query(sql, (user_id, note_id))
 
 
+# Notes linked to a file. DB errors propagate.
 def notes_for_file(db: AppDatabase, user_id: int, file_id: int) -> list[dict[str, Any]]:
     sql = """
         SELECT n.`noteID`, n.`userID`, n.`date_time`, n.`note_title`, n.`contents`
@@ -450,6 +484,7 @@ def notes_for_file(db: AppDatabase, user_id: int, file_id: int) -> list[dict[str
     return db.query(sql, (user_id, file_id))
 
 
+# Delete task-file link. DB errors propagate.
 def unlink_task_from_file(db: AppDatabase, user_id: int, task_id: int, file_id: int) -> int:
     return db.execute_write(
         "DELETE FROM task_files WHERE `userID` = %s AND `taskID` = %s AND `fileID` = %s",
@@ -457,6 +492,7 @@ def unlink_task_from_file(db: AppDatabase, user_id: int, task_id: int, file_id: 
     )
 
 
+# Files linked to a task. DB errors propagate.
 def files_for_task(db: AppDatabase, user_id: int, task_id: int) -> list[dict[str, Any]]:
     sql = """
         SELECT f.`fileID`, f.`userID`, f.`link`, f.`local_file_address`
@@ -467,6 +503,7 @@ def files_for_task(db: AppDatabase, user_id: int, task_id: int) -> list[dict[str
     return db.query(sql, (user_id, task_id))
 
 
+# Tasks linked to a file. DB errors propagate.
 def tasks_for_file(db: AppDatabase, user_id: int, file_id: int) -> list[dict[str, Any]]:
     sql = """
         SELECT t.`taskID`, t.`userID`, t.`task_name`, t.`status`, t.`due_date`, t.`date_created`, t.`tags`
@@ -477,6 +514,7 @@ def tasks_for_file(db: AppDatabase, user_id: int, file_id: int) -> list[dict[str
     return db.query(sql, (user_id, file_id))
 
 
+# Extract text from PDF; missing pypdf or empty text -> (False, msg); parse errors may still propagate.
 def _extract_pdf_text(pdf_bytes: bytes) -> tuple[bool, str]:
     try:
         from pypdf import PdfReader  # type: ignore
@@ -495,6 +533,7 @@ def _extract_pdf_text(pdf_bytes: bytes) -> tuple[bool, str]:
     return True, text
 
 
+# Turn flat text into simple markdown sections (local only; no I/O errors).
 def _format_plain_text_as_markdown_notes(raw_text: str) -> str:
     text = raw_text.strip()
     if not text:
@@ -513,6 +552,7 @@ def _format_plain_text_as_markdown_notes(raw_text: str) -> str:
     return body
 
 
+# Call OpenAI API; HTTP/network/shape errors -> (False, message), no uncaught exceptions.
 def _openai_summarize_to_notes(raw_text: str) -> tuple[bool, str]:
     key = os.getenv("OPENAI_API_KEY")
     if not key:
@@ -557,6 +597,7 @@ def _openai_summarize_to_notes(raw_text: str) -> tuple[bool, str]:
         return False, "Unexpected response from OpenAI."
 
 
+# PDF -> notes text; uses OpenAI if key set else markdown fallback; inner steps return errors, don't raise.
 def pdf_bytes_to_study_notes(pdf_bytes: bytes) -> tuple[bool, str]:
     ok, text_or_err = _extract_pdf_text(pdf_bytes)
     if not ok:
